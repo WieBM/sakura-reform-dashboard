@@ -461,7 +461,7 @@
     </div>
     <div class="search-row">
       <input class="search-input" id="prj-search" type="text" placeholder="案件名・顧客名で検索...">
-      <button class="add-btn" onclick="openProjectModal()">＋ 新規案件を追加</button>
+      <button id="btn-add-project" class="add-btn" onclick="openProjectModal()">＋ 新規案件を追加</button>
     </div>
     <div class="filter-bar" id="prj-filter">
       <button class="filter-btn active" data-val="">すべて</button>
@@ -515,7 +515,7 @@
       <button class="filter-btn" data-val="入金済">入金済</button>
       <button class="filter-btn" data-val="未入金">未入金</button>
       <button class="filter-btn" data-val="入金待ち">入金待ち</button>
-      <button class="add-btn" style="margin-left:auto" onclick="openInvoiceModal()">＋ 新規請求を追加</button>
+      <button id="btn-add-invoice" class="add-btn" style="margin-left:auto" onclick="openInvoiceModal()">＋ 新規請求を追加</button>
     </div>
     <div class="table-card">
       <div class="table-wrap">
@@ -539,7 +539,7 @@
     </div>
     <div class="search-row">
       <input class="search-input" id="cus-search" type="text" placeholder="氏名・住所で検索...">
-      <button class="add-btn" onclick="openCustomerModal()">＋ 新規顧客を追加</button>
+      <button id="btn-add-customer" class="add-btn" onclick="openCustomerModal()">＋ 新規顧客を追加</button>
     </div>
     <div class="table-card">
       <div class="table-wrap">
@@ -723,6 +723,7 @@
               <option value="商談中">商談中</option>
               <option value="見積提出済">見積提出済</option>
               <option value="契約済">契約済</option>
+              <option value="完了">完了</option>
               <option value="失注">失注</option>
             </select>
           </div>
@@ -1302,6 +1303,7 @@ async function openStaffModal(projectId, projectName, currentStaff) {
   }
   renderStaffOptions('');
   staffModal.classList.add('open');
+  document.body.style.overflow = 'hidden';
   staffSearchInp.focus();
 }
 
@@ -1348,14 +1350,15 @@ async function saveStaff(surname) {
   const proj = allProjects.find(p => p.id === modalProjectId);
   if (proj) proj.staff = surname || null;
   staffModal.classList.remove('open');
+  document.body.style.overflow = '';
   renderProjects();
   if (loaded['employees']) { loaded['employees'] = false; loadEmployees(); }
   if (loaded['staff'])     { loaded['staff'] = false; loadStaff(); }
 }
 
 staffSearchInp.addEventListener('input', e => renderStaffOptions(e.target.value));
-modalClose.addEventListener('click', () => staffModal.classList.remove('open'));
-staffModal.addEventListener('click', e => { if (e.target === staffModal) staffModal.classList.remove('open'); });
+modalClose.addEventListener('click', () => { staffModal.classList.remove('open'); document.body.style.overflow = ''; });
+staffModal.addEventListener('click', e => { if (e.target === staffModal) { staffModal.classList.remove('open'); document.body.style.overflow = ''; } });
 
 // ─── Employees Workload ───────────────────────────────────────────────────────
 async function loadEmployees() {
@@ -1463,11 +1466,13 @@ function showToast(msg, type='success') {
 // ─── Form Modal Utilities ──────────────────────────────────────────────────────
 function closeFormModal(id) {
   document.getElementById(id).classList.remove('open');
+  document.body.style.overflow = '';
 }
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', e => {
     if (e.target === overlay && overlay.id !== 'staffModal') {
       overlay.classList.remove('open');
+      document.body.style.overflow = '';
     }
   });
 });
@@ -1502,6 +1507,7 @@ function openCustomerModal(id=null) {
     deleteBtn.style.display = 'none';
   }
   document.getElementById('customerModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
   document.getElementById('cus-name').focus();
 }
 
@@ -1590,6 +1596,7 @@ function openProjectModal(id=null) {
     document.getElementById('prj-status').value = '初回訪問済';
   }
   document.getElementById('projectModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
   document.getElementById('prj-name').focus();
 }
 
@@ -1689,6 +1696,7 @@ function openEmployeeModal(id=null) {
     deleteBtn.style.display = 'none';
   }
   document.getElementById('employeeModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
   document.getElementById('emp-name').focus();
 }
 
@@ -1777,6 +1785,7 @@ function openInvoiceModal(id=null) {
     deleteBtn.style.display = 'none';
   }
   document.getElementById('invoiceModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
   document.getElementById('inv-invoice_no').focus();
 }
 

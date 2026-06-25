@@ -64,7 +64,7 @@ app.get("/api/summary", (req, res) => {
 // ─── API: Projects by Status ─────────────────────────────────────────────────
 app.get("/api/projects/by-status", (req, res) => {
   const rows = db.prepare(
-    "SELECT status, COUNT(*) as count, COALESCE(SUM(estimate_amount),0) as total FROM projects GROUP BY status ORDER BY count DESC"
+    "SELECT status, COUNT(*) as count, COALESCE(SUM(COALESCE(contract_amount, estimate_amount)),0) as total FROM projects GROUP BY status ORDER BY count DESC"
   ).all();
   res.json(rows);
 });
@@ -79,15 +79,22 @@ app.get("/api/projects/by-type", (req, res) => {
 
 // ─── API: Monthly Contracted ─────────────────────────────────────────────────
 app.get("/api/projects/monthly", (req, res) => {
-  // contract_date is stored as "YYYY/M/D" (month/day NOT zero-padded), so SQLite's
-  // date()/strftime() cannot parse it. Build a "YYYY-MM" label by extracting the year
-  // and month tokens and zero-padding the month with printf.
+  // contract_date may be stored in two formats:
+  //   - "YYYY/M/D" (legacy Excel import, month/day NOT zero-padded)
+  //   - "YYYY-MM-DD" (ISO, from the CRUD form's HTML date picker)
+  // SQLite's date()/strftime() cannot parse the slash format, so we branch on the
+  // format and build a "YYYY-MM" label for each. For slash dates we extract the year
+  // and month tokens and zero-pad the month with printf; for ISO dates substr(...,1,7)
+  // already yields "YYYY-MM".
   const rows = db.prepare(
-    "SELECT printf('%s-%02d', " +
-    "  substr(contract_date, 1, instr(contract_date, '/') - 1), " +
-    "  CAST(substr(substr(contract_date, instr(contract_date, '/') + 1), 1, " +
-    "    instr(substr(contract_date, instr(contract_date, '/') + 1) || '/', '/') - 1) AS INTEGER)" +
-    ") as month, COUNT(*) as count, SUM(contract_amount) as total " +
+    "SELECT CASE WHEN contract_date LIKE '%/%' THEN " +
+    "  printf('%s-%02d', " +
+    "    substr(contract_date, 1, instr(contract_date, '/') - 1), " +
+    "    CAST(substr(substr(contract_date, instr(contract_date, '/') + 1), 1, " +
+    "      instr(substr(contract_date, instr(contract_date, '/') + 1) || '/', '/') - 1) AS INTEGER)" +
+    "  ) " +
+    "ELSE substr(contract_date, 1, 7) END as month, " +
+    "COUNT(*) as count, SUM(contract_amount) as total " +
     "FROM projects WHERE status='契約済' AND contract_date IS NOT NULL " +
     "GROUP BY month ORDER BY month"
   ).all();
