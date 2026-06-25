@@ -8,6 +8,20 @@ const PORT = 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
+// Reject requests where Japanese text fields contain garbled characters (encoding mismatch)
+const GARBLE_RE = /\?{2,}/;
+const TEXT_FIELDS = ['name','address','note','staff','customer_name','project_name','building_type','source','work_type','billing_type'];
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    for (const key of TEXT_FIELDS) {
+      if (typeof req.body[key] === 'string' && GARBLE_RE.test(req.body[key])) {
+        return res.status(400).json({ error: `フィールド「${key}」の文字コードが不正です。UTF-8で送信してください。` });
+      }
+    }
+  }
+  next();
+});
+
 // Initialize DB
 const db = openDb();
 initSchema(db);
@@ -20,7 +34,7 @@ app.get("/api/summary", (req, res) => {
   ).get();
 
   const pipeline = db.prepare(
-    "SELECT COUNT(*) as count, COALESCE(SUM(estimate_amount),0) as total FROM projects WHERE status NOT IN ('契約済','失注')"
+    "SELECT COUNT(*) as count, COALESCE(SUM(estimate_amount),0) as total FROM projects WHERE status NOT IN ('契約済','失注','完了')"
   ).get();
 
   const lost = db.prepare(
@@ -50,7 +64,7 @@ app.get("/api/summary", (req, res) => {
 // ─── API: Projects by Status ─────────────────────────────────────────────────
 app.get("/api/projects/by-status", (req, res) => {
   const rows = db.prepare(
-    "SELECT status, COUNT(*) as count, COALESCE(SUM(estimate_amount),0) as total FROM projects GROUP BY status ORDER BY count DESC"
+    "SELECT status, COUNT(*) as count, COALESCE(SUM(COALESCE(contract_amount, estimate_amount)),0) as total FROM projects GROUP BY status ORDER BY count DESC"
   ).all();
   res.json(rows);
 });
@@ -65,15 +79,22 @@ app.get("/api/projects/by-type", (req, res) => {
 
 // ─── API: Monthly Contracted ─────────────────────────────────────────────────
 app.get("/api/projects/monthly", (req, res) => {
-  // contract_date is stored as "YYYY/M/D" (month/day NOT zero-padded), so SQLite's
-  // date()/strftime() cannot parse it. Build a "YYYY-MM" label by extracting the year
-  // and month tokens and zero-padding the month with printf.
+  // contract_date may be stored in two formats:
+  //   - "YYYY/M/D" (legacy Excel import, month/day NOT zero-padded)
+  //   - "YYYY-MM-DD" (ISO, from the CRUD form's HTML date picker)
+  // SQLite's date()/strftime() cannot parse the slash format, so we branch on the
+  // format and build a "YYYY-MM" label for each. For slash dates we extract the year
+  // and month tokens and zero-pad the month with printf; for ISO dates substr(...,1,7)
+  // already yields "YYYY-MM".
   const rows = db.prepare(
-    "SELECT printf('%s-%02d', " +
-    "  substr(contract_date, 1, instr(contract_date, '/') - 1), " +
-    "  CAST(substr(substr(contract_date, instr(contract_date, '/') + 1), 1, " +
-    "    instr(substr(contract_date, instr(contract_date, '/') + 1) || '/', '/') - 1) AS INTEGER)" +
-    ") as month, COUNT(*) as count, SUM(contract_amount) as total " +
+    "SELECT CASE WHEN contract_date LIKE '%/%' THEN " +
+    "  printf('%s-%02d', " +
+    "    substr(contract_date, 1, instr(contract_date, '/') - 1), " +
+    "    CAST(substr(substr(contract_date, instr(contract_date, '/') + 1), 1, " +
+    "      instr(substr(contract_date, instr(contract_date, '/') + 1) || '/', '/') - 1) AS INTEGER)" +
+    "  ) " +
+    "ELSE substr(contract_date, 1, 7) END as month, " +
+    "COUNT(*) as count, SUM(contract_amount) as total " +
     "FROM projects WHERE status='契約済' AND contract_date IS NOT NULL " +
     "GROUP BY month ORDER BY month"
   ).all();
@@ -83,12 +104,16 @@ app.get("/api/projects/monthly", (req, res) => {
 // ─── API: Project List ───────────────────────────────────────────────────────
 app.get("/api/projects", (req, res) => {
   const { status, type } = req.query;
-  let sql = "SELECT * FROM projects WHERE 1=1";
+  let sql = "SELECT *, CAST(probability AS TEXT) as probability FROM projects WHERE 1=1";
   const params = [];
   if (status) { sql += " AND status=?"; params.push(status); }
   if (type) { sql += " AND work_type=?"; params.push(type); }
   sql += " ORDER BY id DESC";
-  res.json(db.prepare(sql).all(...params));
+  const rows = db.prepare(sql).all(...params).map(r => ({
+    ...r,
+    probability: r.probability ? r.probability.replace(/\.0$/, '') : r.probability,
+  }));
+  res.json(rows);
 });
 
 // ─── API: Create Project ─────────────────────────────────────────────────────

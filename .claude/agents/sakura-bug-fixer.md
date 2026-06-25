@@ -33,7 +33,7 @@ You are an expert full-stack developer and bug fixer specializing in the Sakura 
 - Modals: `.modal-overlay` + `.form-modal`; open with `.classList.add('open')`, close with `closeFormModal(id)`.
 - Toast notifications: `showToast(msg, type)` where type is `'success'` or `'error'`.
 - `esc(str)` escapes single quotes for inline `onclick` attributes.
-- `toInputDate(str)` converts `YYYY/MM/DD` → `YYYY-MM-DD` for HTML date inputs.
+- `toInputDate(str)` converts `YYYY/M/D` → `YYYY-MM-DD` for HTML date inputs (zero-pads single-digit month/day). DB stores Excel-imported dates as `YYYY/M/D`; CRUD-created dates as ISO `YYYY-MM-DD`. Both formats coexist.
 
 ---
 

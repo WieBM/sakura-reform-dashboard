@@ -60,9 +60,10 @@ npm start        # starts on http://localhost:3000
 
 **Known DB value constraints** (form fields must match these exactly):
 - `projects.work_type`: `外装` / `内装` / `水回り` / `省エネ` / `建具` / `バリアフリー`
+- `projects.status`: `初回訪問済` / `現地調査済` / `商談中` / `見積提出済` / `契約済` / `完了` / `失注`
 - `invoices.payment_status`: `入金済` / `未入金` (note: `入金待ち` does not exist in the DB)
 - `customers.building_type`: `一戸建て` / `マンション` / `アパート` / `その他`
-- Dates are stored as `YYYY/M/D` (single-digit month/day, slash-separated) — not ISO format
+- **Date storage**: Excel-imported rows use `YYYY/M/D` (slash, no zero-padding); CRUD-created rows use ISO `YYYY-MM-DD` (HTML date picker). Both formats coexist in the DB. `/api/projects/monthly` handles both with a `CASE WHEN ... LIKE '%/%'` branch.
 
 ## API Endpoints
 
@@ -72,7 +73,7 @@ npm start        # starts on http://localhost:3000
 |----------|-------------|
 | `GET /api/summary` | KPI summary (contracted total, pipeline, paid/unpaid) |
 | `GET /api/projects` | All projects (filter: `?status=契約済&type=外装`) |
-| `GET /api/projects/by-status` | Project counts grouped by status |
+| `GET /api/projects/by-status` | Project counts grouped by status — `total` uses `COALESCE(contract_amount, estimate_amount)` |
 | `GET /api/projects/by-type` | Amounts grouped by work type |
 | `GET /api/projects/monthly` | Monthly contracted amounts |
 | `GET /api/invoices` | All invoices |
@@ -109,7 +110,7 @@ Key frontend patterns:
 - Page data is cached in `allProjects`, `allCustomers`, `allInvoices`, `allEmployees` arrays.
 - `loaded[page]` flag prevents redundant fetches; set to `false` then call `loadXxx()` to force reload.
 - After any CRUD save/delete, re-fetch the relevant array and call `renderXxx()` directly — do NOT call `loadXxx()` again (it re-binds event listeners).
-- Form modals use `.modal-overlay` + `.form-modal` CSS classes; open with `.classList.add('open')`, close with `closeFormModal(id)`.
+- Form modals use `.modal-overlay` + `.form-modal` CSS classes; open with `.classList.add('open')`, close with `closeFormModal(id)`. Opening sets `document.body.style.overflow = 'hidden'`; all close paths restore it to `''`.
 - Toast notifications via `showToast(msg, type)` (`type`: `'success'` or `'error'`).
 - `esc(str)` helper escapes single quotes for inline `onclick` attributes.
 - `toInputDate(str)` converts `YYYY/M/D` → `YYYY-MM-DD` for HTML date inputs (zero-pads single-digit month/day). **Note**: DB stores dates as `YYYY/M/D` (not zero-padded), so always use this helper when populating `<input type="date">`.
