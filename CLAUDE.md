@@ -58,6 +58,12 @@ npm start        # starts on http://localhost:3000
 
 **Important**: `projects.staff` and `customers.staff` store the employee's **surname only** (e.g. `"田中"`), not the full name. Deleting an employee auto-nulls their staff references in projects and customers.
 
+**Known DB value constraints** (form fields must match these exactly):
+- `projects.work_type`: `外装` / `内装` / `水回り` / `省エネ` / `建具` / `バリアフリー`
+- `invoices.payment_status`: `入金済` / `未入金` (note: `入金待ち` does not exist in the DB)
+- `customers.building_type`: `一戸建て` / `マンション` / `アパート` / `その他`
+- Dates are stored as `YYYY/M/D` (single-digit month/day, slash-separated) — not ISO format
+
 ## API Endpoints
 
 ### Read (GET)
@@ -93,6 +99,8 @@ npm start        # starts on http://localhost:3000
 | `PUT /api/invoices/:id` | Update invoice |
 | `DELETE /api/invoices/:id` | Delete invoice |
 
+**API behaviour**: All PUT/DELETE endpoints return `404` if the target ID does not exist (`result.changes === 0`). Previously returned `200` silently.
+
 ## Frontend Structure
 
 Single-page app with 6 sidebar pages: Dashboard, 案件管理, 請求・入金, 顧客台帳, 社員管理, 担当者実績.
@@ -104,7 +112,30 @@ Key frontend patterns:
 - Form modals use `.modal-overlay` + `.form-modal` CSS classes; open with `.classList.add('open')`, close with `closeFormModal(id)`.
 - Toast notifications via `showToast(msg, type)` (`type`: `'success'` or `'error'`).
 - `esc(str)` helper escapes single quotes for inline `onclick` attributes.
-- `toInputDate(str)` converts `YYYY/MM/DD` → `YYYY-MM-DD` for HTML date inputs.
+- `toInputDate(str)` converts `YYYY/M/D` → `YYYY-MM-DD` for HTML date inputs (zero-pads single-digit month/day). **Note**: DB stores dates as `YYYY/M/D` (not zero-padded), so always use this helper when populating `<input type="date">`.
+- `refreshDashboardKPIs()` re-fetches `/api/summary` and updates the 4 KPI cards only — call after any project/invoice CRUD to keep the dashboard fresh without a full re-render.
+- `populateDatalist(id, values)` dynamically fills a `<datalist>` element. Used for `source` (customer) and `work_type` (project) to keep suggestions in sync with actual DB values.
+
+## AI Agent Workflow
+
+Two custom agents are available in `.claude/agents/` for automated QA and bug fixing:
+
+| Agent | File | Role |
+|-------|------|------|
+| `sakura-ux-qa-auditor` | `.claude/agents/sakura-ux-qa-auditor.md` | Playwright-based UX audit — finds bugs, saves a report, does NOT modify code |
+| `sakura-bug-fixer` | `.claude/agents/sakura-bug-fixer.md` | Reads a bug report and applies targeted fixes to `server.js` / `index.html` |
+
+### Report Naming Convention
+
+All AI-generated reports are saved to `dashboard/claude-reports/` following this format:
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| Bug audit | `BUG_REPORT_YYYY-MM-DD.md` | `BUG_REPORT_2026-06-25.md` |
+| UX audit | `AUDIT_REPORT_YYYY-MM-DD.md` | `AUDIT_REPORT_2026-06-25.md` |
+| Fix report | `FIX_REPORT_YYYY-MM-DD.md` | `FIX_REPORT_2026-06-25.md` |
+
+If multiple reports exist for the same date, append `_2`, `_3`, etc. File names must be **UPPERCASE with underscores**.
 
 ## Efficient Incremental Testing Workflow
 
