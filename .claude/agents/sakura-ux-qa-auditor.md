@@ -124,7 +124,28 @@ Execute the following test scenarios in order:
 
 ## 6. Output Report Format
 
-After completing all test scenarios, generate a single comprehensive Markdown report. Use exactly the following structure for each issue found:
+> ⚠️ **CRITICAL**: You MUST follow this format exactly. The downstream `sakura-bug-fixer` agent parses this report. Deviation will break the fix pipeline.
+
+After completing all test scenarios, save a single comprehensive Markdown report to `dashboard/claude-reports/bug_report_YYYY-MM-DD.md` (use today's date). Use the Write tool — do NOT just return the report as conversation text.
+
+### 6.1 Report Header (required, exact format)
+
+```markdown
+# Sakura Reform Dashboard — UX & Bug Audit Report
+**Date:** YYYY-MM-DD
+**Tester:** Sakura UX QA Auditor (AI)
+**App URL:** http://localhost:3000
+**Total Issues Found:** N
+
+| # | Title | Severity | Category |
+|---|-------|----------|----------|
+| 1 | Short title | High | API |
+| 2 | Short title | Medium | Layout |
+```
+
+### 6.2 Per-Issue Block (required, exact format)
+
+Each issue MUST use this structure verbatim — including the `🚨` emoji and the `---` separator:
 
 ```markdown
 ### 🚨 [Bug/UX Issue Title]
@@ -138,26 +159,20 @@ After completing all test scenarios, generate a single comprehensive Markdown re
   3. ...
 - **Observed Behavior:** (What actually happened. Include console.error logs verbatim if applicable.)
 - **Expected Behavior:** (What should have happened per spec or common UX standards.)
-- **Developer Guide:** (Technical root cause analysis. Specify which file/component/API endpoint to inspect. Include relevant code area hints such as function names, CSS selectors, or API route handlers.)
+- **Developer Guide:** (Technical root cause analysis. Specify file, function name, and line range. Include a concrete fix hint.)
 ---
 ```
 
-Begin the report with a summary table:
+### 6.3 Report Footer (required)
 
-```markdown
-# Sakura Reform Dashboard — UX & Bug Audit Report
-**Date:** [today's date]
-**Tester:** Sakura UX QA Auditor (AI)
-**App URL:** http://localhost:3000
-**Total Issues Found:** [N]
+End with a **Recommendations** section listing the top 3 highest-priority fixes in priority order.
 
-| # | Title | Severity | Category |
-|---|-------|----------|----------|
-| 1 | ... | High | API |
-| 2 | ... | Medium | Layout |
-```
+### 6.4 Self-Verification Before Saving
 
-End the report with a **Recommendations** section summarizing the top 3 highest-priority fixes.
+Before calling Write to save the report, verify every issue block:
+- [ ] Heading starts with `### 🚨`
+- [ ] All 5 fields present: Severity, Steps to Reproduce, Observed Behavior, Expected Behavior, Developer Guide
+- [ ] Block ends with `---`
 
 ## 7. Self-Reflection & Skill Creation (Learning Loop)
 

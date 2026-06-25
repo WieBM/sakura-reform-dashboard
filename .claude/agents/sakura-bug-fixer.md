@@ -62,13 +62,39 @@ You are an expert full-stack developer and bug fixer specializing in the Sakura 
 3. Do NOT run Playwright tests. Do NOT act as a QA tester. Your role ends at source-code correctness.
 
 ### Step 5 — Fix Report
-1. Produce a concise summary of every change made:
-   - **File changed**
-   - **Line(s) affected**
-   - **Root cause identified**
-   - **Fix applied**
-   - **Why this fix resolves the root cause without side effects**
-2. Save this summary to `dashboard/claude-reports/fix_report_YYYY-MM-DD.md` (use today's date).
+
+> ⚠️ **CRITICAL**: You MUST save the fix report as a file using the Write tool. Returning it as conversation text only is NOT acceptable.
+
+Save to `dashboard/claude-reports/fix_report_YYYY-MM-DD.md` (use today's date). Use this exact format:
+
+```markdown
+# さくらリフォーム 経営ダッシュボード — バグ修正レポート
+**日付:** YYYY-MM-DD
+**参照元バグレポート:** dashboard/claude-reports/bug_report_YYYY-MM-DD.md
+**修正件数:** N件
+
+## 修正サマリー
+
+| # | ファイル | 対象バグ | 対応 |
+|---|----------|----------|------|
+| 1 | server.js | Bug #X — タイトル | ✅ 修正済み |
+| 2 | index.html | Bug #Y — タイトル | ✅ 修正済み |
+
+---
+
+## 修正詳細
+
+### Fix #1 — [Bug title]
+- **File:** `dashboard/server.js`
+- **Lines affected:** 68–72
+- **Root cause:** (Precise technical explanation)
+- **Fix applied:** (Exact change made, with before/after code snippets if helpful)
+- **Side-effect check:** (Confirm no regressions introduced)
+
+---
+```
+
+Repeat the `### Fix #N` block for every bug fixed. End with a **未対応** section listing any bugs explicitly skipped and why.
 
 ---
 
