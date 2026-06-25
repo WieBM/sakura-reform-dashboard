@@ -5,6 +5,21 @@ When a new mistake occurs, add it here and update the checklist accordingly.
 
 ---
 
+## Session 2026-06-25 (3rd)
+
+### MISTAKE-08 — Committed unreleased work directly to main
+
+| Field | Detail |
+|-------|--------|
+| **What happened** | Python utility scripts (`e671afa`) and the TypeScript migration (`fc541b3`) were committed and pushed directly to `main` without an explicit release command from the user |
+| **Rule violated** | All work-in-progress goes to `dev`. Only merge to `main` when the user explicitly requests a release (e.g., "release to main", "버전 릴리즈해줘") |
+| **Impact** | `main` was 2 commits ahead of the last authorized tag (`v1.0.3.1`). Required force-push to correct |
+| **Correct flow** | `dev` → feature work → user says "release" → merge `dev` into `main` → tag the release |
+| **Discovered by** | User pointed it out: "내가 버전 릴리즈를 명령 안했었잖아" |
+| **Prevention** | Before any `git push origin main` or `git checkout main && git commit`, confirm the user has explicitly authorized a release for the current work |
+
+---
+
 ## Session 2026-06-25 (2nd)
 
 ### MISTAKE-07 — E2E test run via direct API calls instead of auditor agent
