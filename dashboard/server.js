@@ -65,8 +65,15 @@ app.get("/api/projects/by-type", (req, res) => {
 
 // ─── API: Monthly Contracted ─────────────────────────────────────────────────
 app.get("/api/projects/monthly", (req, res) => {
+  // contract_date is stored as "YYYY/M/D" (month/day NOT zero-padded), so SQLite's
+  // date()/strftime() cannot parse it. Build a "YYYY-MM" label by extracting the year
+  // and month tokens and zero-padding the month with printf.
   const rows = db.prepare(
-    "SELECT SUBSTR(contract_date,1,7) as month, COUNT(*) as count, SUM(contract_amount) as total " +
+    "SELECT printf('%s-%02d', " +
+    "  substr(contract_date, 1, instr(contract_date, '/') - 1), " +
+    "  CAST(substr(substr(contract_date, instr(contract_date, '/') + 1), 1, " +
+    "    instr(substr(contract_date, instr(contract_date, '/') + 1) || '/', '/') - 1) AS INTEGER)" +
+    ") as month, COUNT(*) as count, SUM(contract_amount) as total " +
     "FROM projects WHERE status='契約済' AND contract_date IS NOT NULL " +
     "GROUP BY month ORDER BY month"
   ).all();
@@ -103,7 +110,8 @@ app.post("/api/projects", (req, res) => {
 // ─── API: Update Project ─────────────────────────────────────────────────────
 app.put("/api/projects/:id/staff", (req, res) => {
   const { staff } = req.body;
-  db.prepare("UPDATE projects SET staff=? WHERE id=?").run(staff || null, req.params.id);
+  const result = db.prepare("UPDATE projects SET staff=? WHERE id=?").run(staff || null, req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: "案件が見つかりません" });
   res.json({ ok: true });
 });
 
@@ -111,19 +119,21 @@ app.put("/api/projects/:id", (req, res) => {
   const { name, customer_name, address, work_type, staff, status, probability,
           estimate_amount, first_visit, scheduled_start, contract_date, contract_amount, note } = req.body;
   if (!name || !customer_name) return res.status(400).json({ error: "案件名と顧客名は必須です" });
-  db.prepare(`
+  const result = db.prepare(`
     UPDATE projects SET name=?,customer_name=?,address=?,work_type=?,staff=?,status=?,
       probability=?,estimate_amount=?,first_visit=?,scheduled_start=?,
       contract_date=?,contract_amount=?,note=? WHERE id=?
   `).run(name, customer_name, address||null, work_type||null, staff||null, status,
          probability||null, estimate_amount||null, first_visit||null, scheduled_start||null,
          contract_date||null, contract_amount||null, note||null, req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: "案件が見つかりません" });
   res.json({ ok: true });
 });
 
 // ─── API: Delete Project ─────────────────────────────────────────────────────
 app.delete("/api/projects/:id", (req, res) => {
-  db.prepare("DELETE FROM projects WHERE id=?").run(req.params.id);
+  const result = db.prepare("DELETE FROM projects WHERE id=?").run(req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: "案件が見つかりません" });
   res.json({ ok: true });
 });
 
@@ -151,17 +161,19 @@ app.put("/api/invoices/:id", (req, res) => {
   const { invoice_no, project_name, customer_name, billing_type, billing_date,
           amount, due_date, payment_status, payment_date, note } = req.body;
   if (!invoice_no || !project_name) return res.status(400).json({ error: "請求番号と案件名は必須です" });
-  db.prepare(
+  const result = db.prepare(
     "UPDATE invoices SET invoice_no=?,project_name=?,customer_name=?,billing_type=?,billing_date=?,amount=?,due_date=?,payment_status=?,payment_date=?,note=? WHERE id=?"
   ).run(invoice_no, project_name, customer_name||null, billing_type||null,
         billing_date||null, amount||null, due_date||null,
         payment_status||'未入金', payment_date||null, note||null, req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: "請求データが見つかりません" });
   res.json({ ok: true });
 });
 
 // ─── API: Delete Invoice ─────────────────────────────────────────────────────
 app.delete("/api/invoices/:id", (req, res) => {
-  db.prepare("DELETE FROM invoices WHERE id=?").run(req.params.id);
+  const result = db.prepare("DELETE FROM invoices WHERE id=?").run(req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: "請求データが見つかりません" });
   res.json({ ok: true });
 });
 
@@ -219,21 +231,22 @@ app.post("/api/employees", (req, res) => {
 app.put("/api/employees/:id", (req, res) => {
   const { name, department, role, qualification, extension, mobile, email } = req.body;
   if (!name) return res.status(400).json({ error: "氏名は必須です" });
-  db.prepare(
+  const result = db.prepare(
     "UPDATE employees SET name=?,department=?,role=?,qualification=?,extension=?,mobile=?,email=? WHERE id=?"
   ).run(name, department||null, role||null, qualification||null,
         extension||null, mobile||null, email||null, req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: "社員が見つかりません" });
   res.json({ ok: true });
 });
 
 // ─── API: Delete Employee ─────────────────────────────────────────────────────
 app.delete("/api/employees/:id", (req, res) => {
   const emp = db.prepare("SELECT name FROM employees WHERE id=?").get(req.params.id);
-  if (emp) {
-    const surname = emp.name.split(" ")[0];
-    db.prepare("UPDATE projects SET staff=NULL WHERE staff=?").run(surname);
-    db.prepare("UPDATE customers SET staff=NULL WHERE staff=?").run(surname);
-  }
+  if (!emp) return res.status(404).json({ error: "社員が見つかりません" });
+  // Surname is the first token, splitting on either ASCII (U+0020) or full-width (U+3000) space.
+  const surname = emp.name.split(/[ 　]/)[0];
+  db.prepare("UPDATE projects SET staff=NULL WHERE staff=?").run(surname);
+  db.prepare("UPDATE customers SET staff=NULL WHERE staff=?").run(surname);
   db.prepare("DELETE FROM employees WHERE id=?").run(req.params.id);
   res.json({ ok: true });
 });
@@ -258,16 +271,18 @@ app.post("/api/customers", (req, res) => {
 app.put("/api/customers/:id", (req, res) => {
   const { name, address, building_type, age_years, phone, email, source, staff, note } = req.body;
   if (!name) return res.status(400).json({ error: "氏名は必須です" });
-  db.prepare(
+  const result = db.prepare(
     "UPDATE customers SET name=?,address=?,building_type=?,age_years=?,phone=?,email=?,source=?,staff=?,note=? WHERE id=?"
   ).run(name, address||null, building_type||null, age_years||null,
         phone||null, email||null, source||null, staff||null, note||null, req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: "顧客が見つかりません" });
   res.json({ ok: true });
 });
 
 // ─── API: Delete Customer ─────────────────────────────────────────────────────
 app.delete("/api/customers/:id", (req, res) => {
-  db.prepare("DELETE FROM customers WHERE id=?").run(req.params.id);
+  const result = db.prepare("DELETE FROM customers WHERE id=?").run(req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: "顧客が見つかりません" });
   res.json({ ok: true });
 });
 
