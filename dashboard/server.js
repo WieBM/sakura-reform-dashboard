@@ -8,6 +8,20 @@ const PORT = 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
+// Reject requests where Japanese text fields contain garbled characters (encoding mismatch)
+const GARBLE_RE = /\?{2,}/;
+const TEXT_FIELDS = ['name','address','note','staff','customer_name','project_name','building_type','source','work_type','billing_type'];
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    for (const key of TEXT_FIELDS) {
+      if (typeof req.body[key] === 'string' && GARBLE_RE.test(req.body[key])) {
+        return res.status(400).json({ error: `フィールド「${key}」の文字コードが不正です。UTF-8で送信してください。` });
+      }
+    }
+  }
+  next();
+});
+
 // Initialize DB
 const db = openDb();
 initSchema(db);
@@ -20,7 +34,7 @@ app.get("/api/summary", (req, res) => {
   ).get();
 
   const pipeline = db.prepare(
-    "SELECT COUNT(*) as count, COALESCE(SUM(estimate_amount),0) as total FROM projects WHERE status NOT IN ('契約済','失注')"
+    "SELECT COUNT(*) as count, COALESCE(SUM(estimate_amount),0) as total FROM projects WHERE status NOT IN ('契約済','失注','完了')"
   ).get();
 
   const lost = db.prepare(
@@ -83,12 +97,16 @@ app.get("/api/projects/monthly", (req, res) => {
 // ─── API: Project List ───────────────────────────────────────────────────────
 app.get("/api/projects", (req, res) => {
   const { status, type } = req.query;
-  let sql = "SELECT * FROM projects WHERE 1=1";
+  let sql = "SELECT *, CAST(probability AS TEXT) as probability FROM projects WHERE 1=1";
   const params = [];
   if (status) { sql += " AND status=?"; params.push(status); }
   if (type) { sql += " AND work_type=?"; params.push(type); }
   sql += " ORDER BY id DESC";
-  res.json(db.prepare(sql).all(...params));
+  const rows = db.prepare(sql).all(...params).map(r => ({
+    ...r,
+    probability: r.probability ? r.probability.replace(/\.0$/, '') : r.probability,
+  }));
+  res.json(rows);
 });
 
 // ─── API: Create Project ─────────────────────────────────────────────────────
