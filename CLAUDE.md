@@ -137,6 +137,17 @@ All AI-generated reports are saved to `dashboard/claude-reports/` following this
 
 If multiple reports exist for the same date, append `_2`, `_3`, etc. File names must be **UPPERCASE with underscores**.
 
+### Pre-push Checklist
+
+Run `/wrap-up` before every `git push` to automatically verify:
+1. CLAUDE.md updated after significant changes
+2. Report file names follow `TYPE_YYYY-MM-DD.md` convention
+3. Every `BUG_REPORT_N` has a matching `FIX_REPORT_N`
+4. No unstaged files
+5. `claude-reports/README.md` in sync with actual files
+
+Past mistake log: `.claude/commands/references/past-mistakes.md`
+
 ## Efficient Incremental Testing Workflow
 
 Rules for testing only what changed — no redundant checks, no wasted tokens.
