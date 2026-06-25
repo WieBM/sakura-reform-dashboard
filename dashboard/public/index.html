@@ -331,7 +331,9 @@
 
   /* ─── Breakpoint: Mobile (≤480px) ────────────────────────── */
   @media (max-width: 480px) {
-    .main { margin-left: 60px; padding: 20px 12px; }
+    .topbar { display: flex; }
+    .sidebar { display: none; }
+    .main { margin-left: 0; padding: 20px 12px; padding-top: 68px; }
     .kpi-card { padding: 14px 14px; }
     .kpi-value { font-size: 20px; }
     .kpi-icon { display: none; }
@@ -901,10 +903,13 @@ function fmt(n) {
 }
 function badge(status) {
   const s = STATUS_COLOR[status] || { cls: 'badge-gray' };
-  return `<span class="badge ${s.cls}">${status}</span>`;
+  return `<span class="badge ${s.cls}">${html(status)}</span>`;
 }
 function esc(str) {
   return (str||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+}
+function html(str) {
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function toInputDate(dateStr) {
   if (!dateStr) return '';
@@ -937,6 +942,7 @@ sidebarToggle.addEventListener('click', () => {
   }
 });
 overlay.addEventListener('click', closeSidebar);
+document.getElementById('hamburger').addEventListener('click', openSidebar);
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
 document.querySelectorAll('.nav-item').forEach(el => {
@@ -963,14 +969,22 @@ function loadPage(page) {
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
+let chartStatusInst = null, chartTypeInst = null, chartMonthlyInst = null;
+
 async function loadDashboard() {
-  const [summary, byStatus, byType, monthly, projects] = await Promise.all([
-    fetch('/api/summary').then(r=>r.json()),
-    fetch('/api/projects/by-status').then(r=>r.json()),
-    fetch('/api/projects/by-type').then(r=>r.json()),
-    fetch('/api/projects/monthly').then(r=>r.json()),
-    fetch('/api/projects?status=契約済').then(r=>r.json()),
-  ]);
+  let summary, byStatus, byType, monthly, projects;
+  try {
+    [summary, byStatus, byType, monthly, projects] = await Promise.all([
+      fetch('/api/summary').then(r=>r.json()),
+      fetch('/api/projects/by-status').then(r=>r.json()),
+      fetch('/api/projects/by-type').then(r=>r.json()),
+      fetch('/api/projects/monthly').then(r=>r.json()),
+      fetch('/api/projects?status=契約済').then(r=>r.json()),
+    ]);
+  } catch(err) {
+    showToast('ダッシュボードデータの取得に失敗しました', 'error');
+    return;
+  }
 
   document.getElementById('kpi-contracted').textContent = fmt(summary.contracted_total);
   document.getElementById('kpi-contracted-count').textContent = `${summary.contracted_count}件 受注済み`;
@@ -981,7 +995,8 @@ async function loadDashboard() {
   document.getElementById('kpi-total').textContent = `${summary.total_projects}件`;
   document.getElementById('kpi-lost').textContent = `失注 ${summary.lost_count}件`;
 
-  new Chart(document.getElementById('chartStatus'), {
+  if (chartStatusInst) chartStatusInst.destroy();
+  chartStatusInst = new Chart(document.getElementById('chartStatus'), {
     type: 'doughnut',
     data: {
       labels: byStatus.map(r => r.status),
@@ -993,7 +1008,8 @@ async function loadDashboard() {
     }
   });
 
-  new Chart(document.getElementById('chartType'), {
+  if (chartTypeInst) chartTypeInst.destroy();
+  chartTypeInst = new Chart(document.getElementById('chartType'), {
     type: 'bar',
     data: {
       labels: byType.map(r => r.work_type),
@@ -1011,7 +1027,8 @@ async function loadDashboard() {
     }
   });
 
-  new Chart(document.getElementById('chartMonthly'), {
+  if (chartMonthlyInst) chartMonthlyInst.destroy();
+  chartMonthlyInst = new Chart(document.getElementById('chartMonthly'), {
     type: 'bar',
     data: {
       labels: monthly.map(r => r.month),
@@ -1032,11 +1049,11 @@ async function loadDashboard() {
   const tbody = document.querySelector('#tbl-recent tbody');
   projects.slice(0, 10).forEach(p => {
     tbody.insertAdjacentHTML('beforeend', `<tr>
-      <td>${p.name}</td>
-      <td>${p.customer_name}</td>
-      <td>${p.work_type||'—'}</td>
-      <td>${p.staff || '—'}</td>
-      <td>${p.scheduled_start || '—'}</td>
+      <td>${html(p.name)}</td>
+      <td>${html(p.customer_name)}</td>
+      <td>${html(p.work_type||'—')}</td>
+      <td>${html(p.staff || '—')}</td>
+      <td>${html(p.scheduled_start || '—')}</td>
       <td class="amount positive">${fmt(p.contract_amount)}</td>
     </tr>`);
   });
@@ -1045,7 +1062,12 @@ async function loadDashboard() {
 // ─── Projects ─────────────────────────────────────────────────────────────────
 let allProjects = [];
 async function loadProjects() {
-  allProjects = await fetch('/api/projects').then(r=>r.json());
+  try {
+    allProjects = await fetch('/api/projects').then(r=>r.json());
+  } catch(err) {
+    showToast('案件データの取得に失敗しました', 'error');
+    return;
+  }
   renderProjects();
 
   document.querySelectorAll('#prj-filter .filter-btn').forEach(btn => {
@@ -1070,19 +1092,19 @@ function renderProjects() {
   tbody.innerHTML = '';
   filtered.forEach(p => {
     const staffHtml = `<span class="staff-btn" onclick="openStaffModal(${p.id},'${esc(p.name)}','${esc(p.staff||'')}')">
-      ${p.staff ? p.staff : '<span class="no-staff">未割当</span>'}
+      ${p.staff ? html(p.staff) : '<span class="no-staff">未割当</span>'}
       <span class="pencil">✏</span>
     </span>`;
     tbody.insertAdjacentHTML('beforeend', `<tr>
-      <td>${p.name}</td>
-      <td>${p.customer_name}</td>
-      <td>${p.work_type||'—'}</td>
+      <td>${html(p.name)}</td>
+      <td>${html(p.customer_name)}</td>
+      <td>${html(p.work_type||'—')}</td>
       <td>${staffHtml}</td>
       <td>${badge(p.status)}</td>
-      <td>${p.probability || '—'}</td>
+      <td>${html(p.probability || '—')}</td>
       <td class="amount">${fmt(p.estimate_amount)}</td>
       <td class="amount positive">${p.contract_amount ? fmt(p.contract_amount) : '—'}</td>
-      <td>${p.contract_date || '—'}</td>
+      <td>${html(p.contract_date || '—')}</td>
       <td><div class="action-cell">
         <button class="action-btn" onclick="openProjectModal(${p.id})">✏ 編集</button>
         <button class="action-btn del" onclick="deleteProject(${p.id},'${esc(p.name)}')">🗑</button>
@@ -1094,7 +1116,12 @@ function renderProjects() {
 // ─── Invoices ─────────────────────────────────────────────────────────────────
 let allInvoices = [];
 async function loadInvoices() {
-  allInvoices = await fetch('/api/invoices').then(r=>r.json());
+  try {
+    allInvoices = await fetch('/api/invoices').then(r=>r.json());
+  } catch(err) {
+    showToast('請求データの取得に失敗しました', 'error');
+    return;
+  }
   updateInvoiceKPIs();
   renderInvoices();
 
@@ -1123,20 +1150,20 @@ function renderInvoices() {
   filtered.forEach(i => {
     const paid = i.payment_status === '入金済';
     tbody.insertAdjacentHTML('beforeend', `<tr>
-      <td>${i.invoice_no||'—'}</td>
-      <td>${i.project_name||'—'}</td>
-      <td>${i.customer_name||'—'}</td>
-      <td>${i.billing_type||'—'}</td>
-      <td>${i.billing_date || '—'}</td>
+      <td>${html(i.invoice_no||'—')}</td>
+      <td>${html(i.project_name||'—')}</td>
+      <td>${html(i.customer_name||'—')}</td>
+      <td>${html(i.billing_type||'—')}</td>
+      <td>${html(i.billing_date || '—')}</td>
       <td class="amount">${fmt(i.amount)}</td>
-      <td>${i.due_date || '—'}</td>
+      <td>${html(i.due_date || '—')}</td>
       <td>${paid
         ? '<span class="badge badge-green">入金済</span>'
-        : '<span class="badge badge-red">'+i.payment_status+'</span>'}</td>
-      <td>${i.payment_date || '—'}</td>
+        : '<span class="badge badge-red">'+html(i.payment_status)+'</span>'}</td>
+      <td>${html(i.payment_date || '—')}</td>
       <td><div class="action-cell">
         <button class="action-btn" onclick="openInvoiceModal(${i.id})">✏ 編集</button>
-        <button class="action-btn del" onclick="deleteInvoice(${i.id})">🗑</button>
+        <button class="action-btn del" onclick="deleteInvoice(${i.id},'${esc(i.invoice_no||'')}')">🗑</button>
       </div></td>
     </tr>`);
   });
@@ -1145,7 +1172,12 @@ function renderInvoices() {
 // ─── Customers ────────────────────────────────────────────────────────────────
 let allCustomers = [];
 async function loadCustomers() {
-  allCustomers = await fetch('/api/customers').then(r=>r.json());
+  try {
+    allCustomers = await fetch('/api/customers').then(r=>r.json());
+  } catch(err) {
+    showToast('顧客データの取得に失敗しました', 'error');
+    return;
+  }
   renderCustomers();
   document.getElementById('cus-search').addEventListener('input', renderCustomers);
 }
@@ -1158,9 +1190,9 @@ function renderCustomers() {
   tbody.innerHTML = '';
   filtered.forEach(c => {
     tbody.insertAdjacentHTML('beforeend', `<tr>
-      <td>${c.name}</td><td>${c.address||'—'}</td><td>${c.building_type||'—'}</td>
-      <td>${c.age_years ? c.age_years+'年' : '—'}</td>
-      <td>${c.phone||'—'}</td><td>${c.source||'—'}</td><td>${c.staff||'—'}</td>
+      <td>${html(c.name)}</td><td>${html(c.address||'—')}</td><td>${html(c.building_type||'—')}</td>
+      <td>${c.age_years != null ? c.age_years+'年' : '—'}</td>
+      <td>${html(c.phone||'—')}</td><td>${html(c.source||'—')}</td><td>${html(c.staff||'—')}</td>
       <td><div class="action-cell">
         <button class="action-btn" onclick="openCustomerModal(${c.id})">✏ 編集</button>
         <button class="action-btn del" onclick="deleteCustomer(${c.id},'${esc(c.name)}')">🗑</button>
@@ -1171,7 +1203,13 @@ function renderCustomers() {
 
 // ─── Staff ────────────────────────────────────────────────────────────────────
 async function loadStaff() {
-  const rows = await fetch('/api/staff/performance').then(r=>r.json());
+  let rows;
+  try {
+    rows = await fetch('/api/staff/performance').then(r=>r.json());
+  } catch(err) {
+    showToast('担当者実績の取得に失敗しました', 'error');
+    return;
+  }
   const maxRevenue = rows[0]?.revenue || 1;
   const tbody = document.querySelector('#tbl-staff tbody');
   tbody.innerHTML = '';
@@ -1245,10 +1283,10 @@ function renderStaffOptions(q) {
     const div = document.createElement('div');
     div.className = 'staff-opt' + (isCurrent ? ' current' : '');
     div.innerHTML = `
-      <div class="staff-opt-avatar" style="background:${color}">${surname[0]}</div>
+      <div class="staff-opt-avatar" style="background:${color}">${html(surname[0])}</div>
       <div>
-        <div class="staff-opt-name">${e.name}</div>
-        <div class="staff-opt-sub">${e.department} · ${e.role || ''}</div>
+        <div class="staff-opt-name">${html(e.name)}</div>
+        <div class="staff-opt-sub">${html(e.department)} · ${html(e.role || '')}</div>
       </div>
       ${isCurrent ? '<span class="staff-opt-check">✓ 現在</span>' : ''}
     `;
@@ -1276,13 +1314,22 @@ staffModal.addEventListener('click', e => { if (e.target === staffModal) staffMo
 
 // ─── Employees Workload ───────────────────────────────────────────────────────
 async function loadEmployees() {
-  const emps = await fetch('/api/employees/workload').then(r => r.json());
+  let emps;
+  try {
+    emps = await fetch('/api/employees/workload').then(r => r.json());
+  } catch(err) {
+    showToast('社員データの取得に失敗しました', 'error');
+    return;
+  }
   const maxActive = Math.max(...emps.map(e => e.active), 1);
 
   const withProj = emps.filter(e => e.active > 0);
   const avgLoad = withProj.length ? (withProj.reduce((s,e)=>s+e.active,0)/withProj.length).toFixed(1) : 0;
   const busiest = emps[0];
-  const noStaff = (await fetch('/api/projects').then(r=>r.json())).filter(p=>!p.staff && p.status!=='失注').length;
+  let noStaff = 0;
+  try {
+    noStaff = (await fetch('/api/projects').then(r=>r.json())).filter(p=>!p.staff && p.status!=='失注').length;
+  } catch(err) { /* noStaff stays 0 */ }
 
   document.getElementById('emp-kpi').innerHTML = `
     <div class="kpi-card" style="--kpi-color:#2980b9">
@@ -1298,7 +1345,7 @@ async function loadEmployees() {
     </div>
     <div class="kpi-card" style="--kpi-color:#e74c3c">
       <div class="kpi-label">最多担当</div>
-      <div class="kpi-value">${busiest ? busiest.name.split(' ')[0] : '—'}</div>
+      <div class="kpi-value">${busiest ? html(busiest.name.split(' ')[0]) : '—'}</div>
       <div class="kpi-sub">${busiest ? busiest.active + '件' : ''}</div>
       <div class="kpi-icon">🏆</div>
     </div>
@@ -1331,10 +1378,10 @@ async function loadEmployees() {
     grid.insertAdjacentHTML('beforeend', `
       <div class="emp-card" style="--emp-color:${empColor}">
         <div class="emp-head">
-          <div class="emp-avatar" style="background:${color}">${e.name[0]}</div>
+          <div class="emp-avatar" style="background:${color}">${html(e.name[0])}</div>
           <div>
-            <div class="emp-name">${e.name}</div>
-            <div class="emp-meta">${e.department || ''}${e.role ? ' · ' + e.role : ''}</div>
+            <div class="emp-name">${html(e.name)}</div>
+            <div class="emp-meta">${html(e.department || '')}${e.role ? ' · ' + html(e.role) : ''}</div>
           </div>
         </div>
         <div class="emp-workload-row">
@@ -1398,7 +1445,7 @@ function openCustomerModal(id=null) {
       document.getElementById('cus-name').value = c.name || '';
       document.getElementById('cus-address').value = c.address || '';
       document.getElementById('cus-building_type').value = c.building_type || '';
-      document.getElementById('cus-age_years').value = c.age_years || '';
+      document.getElementById('cus-age_years').value = c.age_years != null ? c.age_years : '';
       document.getElementById('cus-phone').value = c.phone || '';
       document.getElementById('cus-email').value = c.email || '';
       document.getElementById('cus-source').value = c.source || '';
@@ -1427,17 +1474,21 @@ document.getElementById('customerForm').addEventListener('submit', async (e) => 
     staff: document.getElementById('cus-staff').value || null,
     note: document.getElementById('cus-note').value || null,
   };
-  const res = await fetch(id ? `/api/customers/${id}` : '/api/customers', {
-    method: id ? 'PUT' : 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(data)
-  });
-  const json = await res.json();
-  if (!res.ok) { showToast(json.error || 'エラーが発生しました', 'error'); return; }
-  closeFormModal('customerModal');
-  showToast(id ? '顧客情報を更新しました' : '新規顧客を追加しました');
-  allCustomers = await fetch('/api/customers').then(r => r.json());
-  renderCustomers();
+  try {
+    const res = await fetch(id ? `/api/customers/${id}` : '/api/customers', {
+      method: id ? 'PUT' : 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) { showToast(json.error || 'エラーが発生しました', 'error'); return; }
+    closeFormModal('customerModal');
+    showToast(id ? '顧客情報を更新しました' : '新規顧客を追加しました');
+    allCustomers = await fetch('/api/customers').then(r => r.json());
+    renderCustomers();
+  } catch(err) {
+    showToast('通信エラーが発生しました', 'error');
+  }
 });
 
 function deleteCustomerFromModal() {
@@ -1448,7 +1499,9 @@ function deleteCustomerFromModal() {
 
 async function deleteCustomer(id, name) {
   if (!confirm(`「${name}」を削除しますか？\nこの操作は取り消せません。`)) return;
-  const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+  let res;
+  try { res = await fetch(`/api/customers/${id}`, { method: 'DELETE' }); }
+  catch(err) { showToast('通信エラーが発生しました', 'error'); return; }
   if (!res.ok) { showToast('削除に失敗しました', 'error'); return; }
   showToast('顧客を削除しました');
   closeFormModal('customerModal');
@@ -1463,7 +1516,7 @@ function openProjectModal(id=null) {
   document.getElementById('projectIdField').value = id || '';
 
   const fields = ['prj-name','prj-customer_name','prj-address','prj-work_type','prj-staff',
-                  'prj-probability','prj-estimate_amount','prj-contract_amount',
+                  'prj-status','prj-probability','prj-estimate_amount','prj-contract_amount',
                   'prj-first_visit','prj-scheduled_start','prj-contract_date','prj-note'];
   fields.forEach(f => { document.getElementById(f).value = ''; });
 
@@ -1479,8 +1532,8 @@ function openProjectModal(id=null) {
       document.getElementById('prj-staff').value = p.staff || '';
       document.getElementById('prj-status').value = p.status || '初回訪問済';
       document.getElementById('prj-probability').value = p.probability || '';
-      document.getElementById('prj-estimate_amount').value = p.estimate_amount || '';
-      document.getElementById('prj-contract_amount').value = p.contract_amount || '';
+      document.getElementById('prj-estimate_amount').value = p.estimate_amount != null ? p.estimate_amount : '';
+      document.getElementById('prj-contract_amount').value = p.contract_amount != null ? p.contract_amount : '';
       document.getElementById('prj-first_visit').value = toInputDate(p.first_visit);
       document.getElementById('prj-scheduled_start').value = toInputDate(p.scheduled_start);
       document.getElementById('prj-contract_date').value = toInputDate(p.contract_date);
@@ -1513,19 +1566,23 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
     contract_date: document.getElementById('prj-contract_date').value || null,
     note: document.getElementById('prj-note').value || null,
   };
-  const res = await fetch(id ? `/api/projects/${id}` : '/api/projects', {
-    method: id ? 'PUT' : 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(data)
-  });
-  const json = await res.json();
-  if (!res.ok) { showToast(json.error || 'エラーが発生しました', 'error'); return; }
-  closeFormModal('projectModal');
-  showToast(id ? '案件情報を更新しました' : '新規案件を追加しました');
-  allProjects = await fetch('/api/projects').then(r => r.json());
-  renderProjects();
-  if (loaded['dashboard']) loaded['dashboard'] = false;
-  if (loaded['staff']) { loaded['staff'] = false; loadStaff(); }
+  try {
+    const res = await fetch(id ? `/api/projects/${id}` : '/api/projects', {
+      method: id ? 'PUT' : 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) { showToast(json.error || 'エラーが発生しました', 'error'); return; }
+    closeFormModal('projectModal');
+    showToast(id ? '案件情報を更新しました' : '新規案件を追加しました');
+    allProjects = await fetch('/api/projects').then(r => r.json());
+    renderProjects();
+    if (loaded['dashboard']) loaded['dashboard'] = false;
+    if (loaded['staff']) { loaded['staff'] = false; loadStaff(); }
+  } catch(err) {
+    showToast('通信エラーが発生しました', 'error');
+  }
 });
 
 function deleteProjectFromModal() {
@@ -1536,7 +1593,9 @@ function deleteProjectFromModal() {
 
 async function deleteProject(id, name) {
   if (!confirm(`「${name}」を削除しますか？\nこの操作は取り消せません。`)) return;
-  const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+  let res;
+  try { res = await fetch(`/api/projects/${id}`, { method: 'DELETE' }); }
+  catch(err) { showToast('通信エラーが発生しました', 'error'); return; }
   if (!res.ok) { showToast('削除に失敗しました', 'error'); return; }
   showToast('案件を削除しました');
   closeFormModal('projectModal');
@@ -1560,7 +1619,7 @@ function openEmployeeModal(id=null) {
   if (id) {
     title.textContent = '社員情報を編集';
     deleteBtn.style.display = 'inline-block';
-    fetch('/api/employees').then(r=>r.json()).then(emps => {
+    const fillEmpForm = (emps) => {
       const e = emps.find(x => x.id === id);
       if (e) {
         document.getElementById('emp-name').value = e.name || '';
@@ -1571,7 +1630,15 @@ function openEmployeeModal(id=null) {
         document.getElementById('emp-mobile').value = e.mobile || '';
         document.getElementById('emp-email').value = e.email || '';
       }
-    });
+    };
+    if (allEmployees.length) {
+      fillEmpForm(allEmployees);
+    } else {
+      fetch('/api/employees').then(r=>r.json()).then(emps => {
+        allEmployees = emps;
+        fillEmpForm(emps);
+      });
+    }
   } else {
     title.textContent = '新規社員を追加';
     deleteBtn.style.display = 'none';
@@ -1592,19 +1659,21 @@ document.getElementById('employeeForm').addEventListener('submit', async (e) => 
     mobile: document.getElementById('emp-mobile').value || null,
     email: document.getElementById('emp-email').value || null,
   };
-  const res = await fetch(id ? `/api/employees/${id}` : '/api/employees', {
-    method: id ? 'PUT' : 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(data)
-  });
-  const json = await res.json();
+  let res, json;
+  try {
+    res = await fetch(id ? `/api/employees/${id}` : '/api/employees', {
+      method: id ? 'PUT' : 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    json = await res.json();
+  } catch(err) { showToast('通信エラーが発生しました', 'error'); return; }
   if (!res.ok) { showToast(json.error || 'エラーが発生しました', 'error'); return; }
   closeFormModal('employeeModal');
   showToast(id ? '社員情報を更新しました' : '新規社員を追加しました');
   allEmployees = [];
   loaded['employees'] = false;
   loadEmployees();
-  loaded['employees'] = true;
 });
 
 function deleteEmployeeFromModal() {
@@ -1615,14 +1684,15 @@ function deleteEmployeeFromModal() {
 
 async function deleteEmployee(id, name) {
   if (!confirm(`「${name}」を削除しますか？\nこの社員が担当している案件の担当者が未割当になります。`)) return;
-  const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' });
+  let res;
+  try { res = await fetch(`/api/employees/${id}`, { method: 'DELETE' }); }
+  catch(err) { showToast('通信エラーが発生しました', 'error'); return; }
   if (!res.ok) { showToast('削除に失敗しました', 'error'); return; }
   showToast('社員を削除しました');
   closeFormModal('employeeModal');
   allEmployees = [];
   loaded['employees'] = false;
   loadEmployees();
-  loaded['employees'] = true;
   if (loaded['projects']) {
     allProjects = await fetch('/api/projects').then(r=>r.json());
     renderProjects();
@@ -1651,7 +1721,7 @@ function openInvoiceModal(id=null) {
       document.getElementById('inv-customer_name').value = inv.customer_name || '';
       document.getElementById('inv-billing_type').value = inv.billing_type || '';
       document.getElementById('inv-billing_date').value = toInputDate(inv.billing_date);
-      document.getElementById('inv-amount').value = inv.amount || '';
+      document.getElementById('inv-amount').value = inv.amount != null ? inv.amount : '';
       document.getElementById('inv-due_date').value = toInputDate(inv.due_date);
       document.getElementById('inv-payment_status').value = inv.payment_status || '未入金';
       document.getElementById('inv-payment_date').value = toInputDate(inv.payment_date);
@@ -1680,29 +1750,37 @@ document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
     payment_date: document.getElementById('inv-payment_date').value || null,
     note: document.getElementById('inv-note').value || null,
   };
-  const res = await fetch(id ? `/api/invoices/${id}` : '/api/invoices', {
-    method: id ? 'PUT' : 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(data)
-  });
-  const json = await res.json();
-  if (!res.ok) { showToast(json.error || 'エラーが発生しました', 'error'); return; }
-  closeFormModal('invoiceModal');
-  showToast(id ? '請求情報を更新しました' : '新規請求を追加しました');
-  allInvoices = await fetch('/api/invoices').then(r => r.json());
-  updateInvoiceKPIs();
-  renderInvoices();
-  if (loaded['dashboard']) loaded['dashboard'] = false;
+  try {
+    const res = await fetch(id ? `/api/invoices/${id}` : '/api/invoices', {
+      method: id ? 'PUT' : 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    const json = await res.json();
+    if (!res.ok) { showToast(json.error || 'エラーが発生しました', 'error'); return; }
+    closeFormModal('invoiceModal');
+    showToast(id ? '請求情報を更新しました' : '新規請求を追加しました');
+    allInvoices = await fetch('/api/invoices').then(r => r.json());
+    updateInvoiceKPIs();
+    renderInvoices();
+    if (loaded['dashboard']) loaded['dashboard'] = false;
+  } catch(err) {
+    showToast('通信エラーが発生しました', 'error');
+  }
 });
 
 function deleteInvoiceFromModal() {
   const id = +document.getElementById('invoiceIdField').value;
-  deleteInvoice(id);
+  const invoiceNo = document.getElementById('inv-invoice_no').value;
+  deleteInvoice(id, invoiceNo);
 }
 
-async function deleteInvoice(id) {
-  if (!confirm('この請求データを削除しますか？\nこの操作は取り消せません。')) return;
-  const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
+async function deleteInvoice(id, invoiceNo = '') {
+  const label = invoiceNo || `ID:${id}`;
+  if (!confirm(`「${label}」を削除しますか？\nこの操作は取り消せません。`)) return;
+  let res;
+  try { res = await fetch(`/api/invoices/${id}`, { method: 'DELETE' }); }
+  catch(err) { showToast('通信エラーが発生しました', 'error'); return; }
   if (!res.ok) { showToast('削除に失敗しました', 'error'); return; }
   showToast('請求データを削除しました');
   closeFormModal('invoiceModal');
