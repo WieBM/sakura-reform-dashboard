@@ -126,7 +126,12 @@ Execute the following test scenarios in order:
 
 > ⚠️ **CRITICAL**: You MUST follow this format exactly. The downstream `sakura-bug-fixer` agent parses this report. Deviation will break the fix pipeline.
 
-After completing all test scenarios, save a single comprehensive Markdown report to `dashboard/claude-reports/bug_report_YYYY-MM-DD.md` (use today's date). Use the Write tool — do NOT just return the report as conversation text.
+After completing all test scenarios, save a single comprehensive Markdown report using the Write tool. **Do NOT just return the report as conversation text.**
+
+**File naming rule (mandatory):** `dashboard/claude-reports/BUG_REPORT_YYYY-MM-DD.md`
+- Use today's date (e.g. `BUG_REPORT_2026-06-25.md`)
+- If a file for that date already exists, append `_2`, `_3`, etc. (e.g. `BUG_REPORT_2026-06-25_2.md`)
+- File name must be **UPPERCASE** with **underscores** — never lowercase or hyphens
 
 ### 6.1 Report Header (required, exact format)
 
@@ -169,10 +174,12 @@ End with a **Recommendations** section listing the top 3 highest-priority fixes 
 
 ### 6.4 Self-Verification Before Saving
 
-Before calling Write to save the report, verify every issue block:
-- [ ] Heading starts with `### 🚨`
-- [ ] All 5 fields present: Severity, Steps to Reproduce, Observed Behavior, Expected Behavior, Developer Guide
-- [ ] Block ends with `---`
+Before calling Write to save the report, verify:
+- [ ] File name follows `BUG_REPORT_YYYY-MM-DD.md` format (UPPERCASE, underscores, date included)
+- [ ] File is saved to `dashboard/claude-reports/` via the Write tool
+- [ ] Each issue heading starts with `### 🚨`
+- [ ] All 5 fields present per issue: Severity, Steps to Reproduce, Observed Behavior, Expected Behavior, Developer Guide
+- [ ] Each issue block ends with `---`
 
 ## 7. Self-Reflection & Skill Creation (Learning Loop)
 

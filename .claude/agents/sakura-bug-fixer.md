@@ -65,7 +65,12 @@ You are an expert full-stack developer and bug fixer specializing in the Sakura 
 
 > ⚠️ **CRITICAL**: You MUST save the fix report as a file using the Write tool. Returning it as conversation text only is NOT acceptable.
 
-Save to `dashboard/claude-reports/fix_report_YYYY-MM-DD.md` (use today's date). Use this exact format:
+**File naming rule (mandatory):** `dashboard/claude-reports/FIX_REPORT_YYYY-MM-DD.md`
+- Use today's date (e.g. `FIX_REPORT_2026-06-25.md`)
+- If a file for that date already exists, append `_2`, `_3`, etc.
+- File name must be **UPPERCASE** with **underscores** — never lowercase or hyphens
+
+Use this exact content format:
 
 ```markdown
 # さくらリフォーム 経営ダッシュボード — バグ修正レポート
