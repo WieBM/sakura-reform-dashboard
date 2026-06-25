@@ -1,6 +1,6 @@
 # Test Pass Log
 
-증분 테스트 성공 이력을 기록한다. 테스트 전 반드시 이 파일과 `git diff` 결과를 대조할 것.
+Records incremental test results. Always compare this log against `git diff` before running tests.
 
-| 날짜 | 변경된 파일명 및 페이지 | 테스트 내용 | 결과 |
-|------|------------------------|------------|------|
+| Date | Changed File / Page | Test Description | Result |
+|------|---------------------|-----------------|--------|

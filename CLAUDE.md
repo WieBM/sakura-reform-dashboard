@@ -106,24 +106,24 @@ Key frontend patterns:
 - `esc(str)` helper escapes single quotes for inline `onclick` attributes.
 - `toInputDate(str)` converts `YYYY/MM/DD` → `YYYY-MM-DD` for HTML date inputs.
 
-## 효율적인 증분 테스트 (Incremental Testing) 워크플로우
+## Efficient Incremental Testing Workflow
 
-토큰 낭비 없이 변경된 부분만 정확히 검사하기 위한 규칙이다.
+Rules for testing only what changed — no redundant checks, no wasted tokens.
 
-### 1. 상태 추적 파일
-모든 테스트 성공 이력은 `docs/test_pass_log.md`에 기록하고 관리한다.
+### 1. State Tracking File
+All test pass history is recorded and managed in `docs/test_pass_log.md`.
 
-### 2. 테스트 전 확인
-테스트를 수행하기 전, 반드시 `git status` 또는 `git diff`로 변경된 파일을 확인하고 `test_pass_log.md`의 기록과 대조한다.
+### 2. Pre-Test Check
+Before running any test, always run `git status` or `git diff` to identify changed files, then compare against `test_pass_log.md`.
 
-### 3. 중복 검사 방지 (토큰 절약)
-이전에 테스트를 통과했으며 그 이후로 코드가 변경되지 않은 컴포넌트나 페이지는 **절대 재검사하지 않는다**.
+### 3. No Redundant Testing (Token Efficiency)
+Components or pages that previously passed and have had **no code changes since** must **never be re-tested**.
 
-### 4. 로그 업데이트
-수정된 부분의 테스트가 성공적으로 끝나면, 즉시 `docs/test_pass_log.md` 최하단에 다음 형식으로 한 줄 추가한다:
+### 4. Log Update
+Once a test passes for a modified section, immediately append one line to the bottom of `docs/test_pass_log.md` in this format:
 
 ```
-[날짜] | [변경된 파일명 및 페이지] | [테스트 내용] | PASS
+[Date] | [Changed file / page] | [Test description] | PASS
 ```
 
 ---
