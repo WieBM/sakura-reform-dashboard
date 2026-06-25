@@ -1,93 +1,93 @@
-# 과거 실수 기록 (Past Mistakes Log)
+# Past Mistakes Log
 
-`/wrap-up` 체크리스트의 근거가 되는 실수 기록입니다.
-새로운 실수가 발생하면 이 파일에 추가하고, `/wrap-up` 체크리스트도 업데이트하세요.
-
----
-
-## 2026-06-25 세션 (2차)
-
-### MISTAKE-07 — E2E 테스트를 auditor 에이전트 대신 직접 API 호출로 수행
-
-| 항목 | 내용 |
-|------|------|
-| **발생** | 신규 고객 등록 → 안건 진행 → 청구 → 입금의 E2E 테스트를 `sakura-ux-qa-auditor`에 위임하지 않고, PowerShell로 직접 API를 호출해서 수행함 |
-| **문제점** | 직접 API 호출은 백엔드만 테스트 가능. 폼 입력, 모달 동작, 화면 갱신, 콘솔 에러 등 **프론트엔드 버그를 전혀 감지하지 못함** |
-| **올바른 흐름** | `sakura-ux-qa-auditor`가 Playwright로 브라우저를 직접 조작 → 버튼 클릭, 폼 입력, 저장, UI 반응까지 검증 → BUG_REPORT 저장 |
-| **auditor 가능 범위** | ＋ 新規追加 버튼 클릭, 폼 입력 및 제출, 담당者 배정 UI, 상태 변경 모달, KPI 카드 갱신, 콘솔 에러 캡처 — 전부 Playwright로 가능 |
-| **발견 경위** | 사용자가 직접 지적 |
-| **재발 방지** | 데이터 입력/수정이 포함된 테스트는 반드시 `sakura-ux-qa-auditor`에 위임. API 직접 호출 테스트는 백엔드 단독 검증에만 사용 |
+Source of truth for `/wrap-up` checklist rules.
+When a new mistake occurs, add it here and update the checklist accordingly.
 
 ---
 
-### MISTAKE-06 — 버그를 에이전트에게 위임하지 않고 직접 수정
+## Session 2026-06-25 (2nd)
 
-| 항목 | 내용 |
-|------|------|
-| **발생** | E2E 테스트에서 버그 3건을 발견했으나, `sakura-bug-fixer` 에이전트에 위임하지 않고 직접 `server.js`를 수정함 |
-| **규칙 위반** | 버그 수정은 `sakura-bug-fixer` 에이전트 → BUG_REPORT → FIX_REPORT 순서로 진행해야 함 |
-| **올바른 흐름** | 버그 발견 → BUG_REPORT 작성 → `sakura-bug-fixer` 에이전트 호출 → FIX_REPORT 저장 |
-| **발견 경위** | 사용자가 직접 지적 |
-| **재발 방지** | 버그 발견 즉시 먼저 BUG_REPORT를 작성하고, 수정은 반드시 에이전트에게 위임 |
+### MISTAKE-07 — E2E test run via direct API calls instead of auditor agent
 
----
-
-## 2026-06-25 세션
-
-### MISTAKE-01 — 리포트 파일명에 날짜 미포함
-
-| 항목 | 내용 |
-|------|------|
-| **발생** | `sakura-ux-qa-auditor` 에이전트가 버그 리포트를 `bug_report.md` 로 저장 |
-| **규칙 위반** | 파일명에 날짜가 없어 어느 날짜의 리포트인지 구분 불가 |
-| **올바른 형식** | `BUG_REPORT_2026-06-25.md` |
-| **발견 경위** | 사용자가 직접 지적 |
-| **재발 방지** | CHECK 2 — 리포트 파일명 규칙 준수 |
+| Field | Detail |
+|-------|--------|
+| **What happened** | The full E2E flow (new customer → project → billing → payment) was tested by calling APIs directly with PowerShell instead of delegating to `sakura-ux-qa-auditor` |
+| **Problem** | Direct API calls only verify the backend. Frontend bugs (form input, modal behaviour, screen refresh, console errors) are completely invisible |
+| **Correct flow** | `sakura-ux-qa-auditor` drives Playwright → clicks buttons, fills forms, submits, verifies UI reactions → saves BUG_REPORT |
+| **Auditor scope** | Can click add buttons, fill and submit forms, assign staff, change status via modal, verify KPI card refresh, capture console errors — all via Playwright |
+| **Discovered by** | User pointed it out |
+| **Prevention** | Any test involving data entry or UI interaction must be delegated to `sakura-ux-qa-auditor`. Direct API calls are for backend-only validation only. |
 
 ---
 
-### MISTAKE-02 — Fix Report 파일 미저장
+### MISTAKE-06 — Bug fixed directly instead of delegating to agent
 
-| 항목 | 내용 |
-|------|------|
-| **발생** | `sakura-bug-fixer` 에이전트가 수정 내용을 대화 텍스트로만 반환하고 `FIX_REPORT_YYYY-MM-DD.md` 파일을 저장하지 않음 |
-| **규칙 위반** | 에이전트 프롬프트 Step 5: "Save this summary to `dashboard/claude-reports/fix_report_YYYY-MM-DD.md`" |
-| **올바른 동작** | Write 툴로 `FIX_REPORT_2026-06-25.md` 파일 생성 |
-| **발견 경위** | 세션 종료 전 파일 목록 확인 시 발견 |
-| **재발 방지** | CHECK 3 — BUG/FIX 리포트 쌍 일치 여부 |
-
----
-
-### MISTAKE-03 — 리포트 파일명 대소문자 및 구분자 불일치
-
-| 항목 | 내용 |
-|------|------|
-| **발생** | `fix-report-2026-06-25_1.md`, `ux-audit-report-2026-06-25.md` 등 소문자+하이픈 형식으로 저장됨 |
-| **규칙 위반** | README 명명 규칙: `FIX_REPORT_YYYY-MM-DD.md` (대문자 + 언더스코어) |
-| **올바른 형식** | `FIX_REPORT_2026-06-25.md`, `AUDIT_REPORT_2026-06-25.md` |
-| **발견 경위** | 사용자가 직접 지적 |
-| **재발 방지** | CHECK 2 — 리포트 파일명 규칙 준수 |
+| Field | Detail |
+|-------|--------|
+| **What happened** | 3 bugs found during E2E test were fixed directly in `server.js` without delegating to `sakura-bug-fixer` |
+| **Rule violated** | Bug workflow: `sakura-bug-fixer` agent → BUG_REPORT → FIX_REPORT |
+| **Correct flow** | Find bug → write BUG_REPORT → call `sakura-bug-fixer` → save FIX_REPORT |
+| **Discovered by** | User pointed it out |
+| **Prevention** | On finding a bug, always write a BUG_REPORT first. Never apply fixes directly — delegate to the agent. |
 
 ---
 
-### MISTAKE-04 — CLAUDE.md 업데이트 누락
+## Session 2026-06-25
 
-| 항목 | 내용 |
-|------|------|
-| **발생** | 에이전트 추가, 버그 10개 수정, 리포트 규칙 정립 등 중요 변경이 있었으나 CLAUDE.md를 업데이트하지 않음 |
-| **규칙 위반** | CLAUDE.md 첫 줄: "Update this file whenever making significant changes to the codebase" |
-| **누락된 항목** | `toInputDate()` 동작, `refreshDashboardKPIs()`, `populateDatalist()`, API 404 동작, DB 값 제약, 에이전트 섹션, 리포트 명명 규칙 |
-| **발견 경위** | 사용자가 직접 지적 |
-| **재발 방지** | CHECK 1 — CLAUDE.md 업데이트 여부 |
+### MISTAKE-01 — Report filename missing date
+
+| Field | Detail |
+|-------|--------|
+| **What happened** | `sakura-ux-qa-auditor` saved the bug report as `bug_report.md` with no date |
+| **Rule violated** | Without a date in the filename, reports from different sessions are indistinguishable |
+| **Correct format** | `BUG_REPORT_2026-06-25.md` |
+| **Discovered by** | User pointed it out |
+| **Prevention** | CHECK 2 — Report filename convention |
 
 ---
 
-### MISTAKE-05 — 실수 원인 오진 (이모지 누락으로 오해)
+### MISTAKE-02 — Fix report not saved as a file
 
-| 항목 | 내용 |
-|------|------|
-| **발생** | 버그 리포트 문제를 "🚨 이모지 누락"으로 오진하여 에이전트 프롬프트에 이모지 체크리스트를 추가하는 잘못된 수정을 함 |
-| **실제 문제** | 파일명에 날짜가 없는 것 (MISTAKE-01) |
-| **교훈** | 사용자 피드백을 수신했을 때 증상(이모지)이 아닌 근본 원인(파일명 규칙)을 먼저 파악할 것 |
-| **발견 경위** | 사용자가 "이모지가 아니라 날짜 표기가 없는 거야"라고 명확히 지적 |
-| **재발 방지** | 수정 전 항상 실제 파일 내용과 규칙 문서를 대조 확인 |
+| Field | Detail |
+|-------|--------|
+| **What happened** | `sakura-bug-fixer` returned fix content as chat text only; no `FIX_REPORT_YYYY-MM-DD.md` file was written |
+| **Rule violated** | Agent prompt Step 5: save fix summary to `dashboard/claude-reports/FIX_REPORT_YYYY-MM-DD.md` via Write tool |
+| **Correct behaviour** | Use Write tool to create the file |
+| **Discovered by** | Found during end-of-session file listing |
+| **Prevention** | CHECK 3 — BUG/FIX report pairs |
+
+---
+
+### MISTAKE-03 — Report filename wrong case and separator
+
+| Field | Detail |
+|-------|--------|
+| **What happened** | Files saved as `fix-report-2026-06-25_1.md`, `ux-audit-report-2026-06-25.md` (lowercase + hyphens) |
+| **Rule violated** | Convention requires `FIX_REPORT_YYYY-MM-DD.md` (UPPERCASE + underscores) |
+| **Correct format** | `FIX_REPORT_2026-06-25.md`, `AUDIT_REPORT_2026-06-25.md` |
+| **Discovered by** | User pointed it out |
+| **Prevention** | CHECK 2 — Report filename convention |
+
+---
+
+### MISTAKE-04 — CLAUDE.md not updated after significant changes
+
+| Field | Detail |
+|-------|--------|
+| **What happened** | Added agents, fixed 10 bugs, established report conventions — but CLAUDE.md was not updated |
+| **Rule violated** | CLAUDE.md header: "Update this file whenever making significant changes to the codebase" |
+| **Missing items** | `toInputDate()` behaviour, `refreshDashboardKPIs()`, `populateDatalist()`, API 404 behaviour, DB value constraints, agent section, report naming convention |
+| **Discovered by** | User pointed it out |
+| **Prevention** | CHECK 1 — CLAUDE.md up to date |
+
+---
+
+### MISTAKE-05 — Misdiagnosed root cause (blamed missing emoji instead of missing date)
+
+| Field | Detail |
+|-------|--------|
+| **What happened** | Identified the report format problem as "missing 🚨 emoji" and incorrectly added emoji checklists to agent prompts |
+| **Actual problem** | The filename had no date (MISTAKE-01) |
+| **Lesson** | When receiving user feedback, identify the root cause first — not the surface symptom |
+| **Discovered by** | User explicitly said "it's not the emoji, the date is missing" |
+| **Prevention** | Before making any fix, compare the actual file content against the rule document |
