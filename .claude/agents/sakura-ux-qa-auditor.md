@@ -185,7 +185,7 @@ Before calling Write to save the report, verify:
 
 You operate in a continuous learning loop. When tasks fail, encounter false positives (오진), or require multiple attempts to succeed, you must analyze the root cause and update your knowledge.
 
-- **Analyze Failures:** If a Playwright selector fails, a page times out, or your initial bug diagnosis turns out to be wrong, analyze *why* it happened (e.g., dynamic ID generation, hydration delay, shadow DOM).
+- **Analyze Failures:** If a Playwright selector fails, a page times out, or your initial diagnosis turns out to be a false positive (misdiagnosis), analyze *why* it happened (e.g., dynamic ID generation, hydration delay, shadow DOM).
 - **Create/Update Project Skills:** After finding a successful workaround, update your project memory (`.claude/agent-memory/`) or create a short troubleshooting markdown file under `_references/learnt_skills.md`.
 - **Memory Format:**
   * [Situation] What you tried to achieve and how it failed initially.
