@@ -471,6 +471,7 @@
       <button class="filter-btn" data-val="現地調査済">現地調査済</button>
       <button class="filter-btn" data-val="初回訪問済">初回訪問済</button>
       <button class="filter-btn" data-val="失注">失注</button>
+      <button class="filter-btn" data-val="完了">完了</button>
     </div>
     <div class="table-card">
       <div class="table-wrap">
@@ -836,8 +837,12 @@
             <input class="form-input" id="inv-invoice_no" required placeholder="例：INV-2024-001">
           </div>
           <div class="form-group">
-            <label class="form-label">区分</label>
-            <input class="form-input" id="inv-billing_type" placeholder="例：工事費">
+            <label class="form-label">請求種別</label>
+            <select class="form-select" id="inv-billing_type">
+              <option value="">選択してください</option>
+              <option value="一括">一括</option>
+              <option value="分割">分割</option>
+            </select>
           </div>
           <div class="form-group">
             <label class="form-label">案件名 <span class="req">*</span></label>

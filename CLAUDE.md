@@ -62,6 +62,7 @@ npm start        # starts on http://localhost:3000
 - `projects.work_type`: `外装` / `内装` / `水回り` / `省エネ` / `建具` / `バリアフリー`
 - `projects.status`: `初回訪問済` / `現地調査済` / `商談中` / `見積提出済` / `契約済` / `完了` / `失注`
 - `invoices.payment_status`: `入金済` / `未入金` (note: `入金待ち` does not exist in the DB)
+- `invoices.billing_type`: `一括` / `分割` — rendered as a `<select>` in the invoice form (label: "請求種別")
 - `customers.building_type`: `一戸建て` / `マンション` / `アパート` / `その他`
 - **Date storage**: Excel-imported rows use `YYYY/M/D` (slash, no zero-padding); CRUD-created rows use ISO `YYYY-MM-DD` (HTML date picker). Both formats coexist in the DB. `/api/projects/monthly` handles both with a `CASE WHEN ... LIKE '%/%'` branch.
 
