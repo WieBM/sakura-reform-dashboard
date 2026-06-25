@@ -1,0 +1,1720 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>さくらリフォーム 経営ダッシュボード</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #c0392b;
+    --primary-light: #e74c3c;
+    --accent: #e8b4b8;
+    --bg: #f5f6fa;
+    --card: #ffffff;
+    --sidebar: #2c3e50;
+    --sidebar-active: #c0392b;
+    --text: #2c3e50;
+    --text-muted: #7f8c8d;
+    --border: #ecf0f1;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; background: var(--bg); color: var(--text); display: flex; min-height: 100vh; }
+
+  /* ─── Sidebar ─────────────────────────────────────────────── */
+  .sidebar {
+    width: 220px; min-height: 100vh; background: var(--sidebar);
+    display: flex; flex-direction: column;
+    position: fixed; top: 0; left: 0; z-index: 200;
+    transition: transform 0.25s ease, width 0.25s ease;
+  }
+  .sidebar-logo {
+    padding: 24px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.1);
+    overflow: hidden; white-space: nowrap; cursor: pointer; user-select: none;
+    transition: background 0.15s;
+  }
+  .sidebar-logo:hover { background: rgba(255,255,255,0.06); }
+  .sidebar-logo .sakura { font-size: 20px; font-weight: 700; color: var(--accent); }
+  .sidebar-logo .subtitle { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+  .sidebar nav { padding: 16px 0; flex: 1; overflow: hidden; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 12px 20px;
+    color: rgba(255,255,255,0.7); cursor: pointer; font-size: 14px;
+    border-left: 3px solid transparent; transition: all 0.2s;
+    white-space: nowrap; overflow: hidden;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .nav-item.active { background: rgba(192,57,43,0.2); color: #fff; border-left-color: var(--primary); }
+  .nav-item .icon { font-size: 18px; width: 22px; min-width: 22px; text-align: center; }
+  .nav-label { overflow: hidden; transition: opacity 0.2s; }
+  .sidebar-footer {
+    padding: 16px 20px; font-size: 11px; color: rgba(255,255,255,0.3);
+    border-top: 1px solid rgba(255,255,255,0.1); white-space: nowrap; overflow: hidden;
+  }
+
+  /* Overlay (mobile) */
+  .sidebar-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    z-index: 199; opacity: 0; transition: opacity 0.25s;
+  }
+  .sidebar-overlay.show { display: block; opacity: 1; }
+
+  /* Top bar (mobile only) */
+  .topbar {
+    display: none; position: fixed; top: 0; left: 0; right: 0; height: 52px;
+    background: var(--sidebar); z-index: 198; align-items: center; padding: 0 16px; gap: 12px;
+  }
+  .topbar-title { color: var(--accent); font-size: 16px; font-weight: 700; }
+  .hamburger {
+    background: none; border: none; cursor: pointer; padding: 6px;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .hamburger span { display: block; width: 22px; height: 2px; background: #fff; border-radius: 2px; transition: all 0.2s; }
+
+  /* ─── Main ────────────────────────────────────────────────── */
+  .main { margin-left: 220px; flex: 1; padding: 28px 32px; min-width: 0; transition: margin-left 0.25s ease; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ─── Page Header ─────────────────────────────────────────── */
+  .page-header { margin-bottom: 24px; }
+  .page-header h1 { font-size: 22px; font-weight: 700; color: var(--text); }
+  .page-header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+  /* ─── KPI Cards ───────────────────────────────────────────── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .kpi-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .kpi-card {
+    background: var(--card); border-radius: 12px; padding: 20px 24px;
+    box-shadow: var(--shadow); position: relative; overflow: hidden;
+  }
+  .kpi-card::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--kpi-color, var(--primary));
+  }
+  .kpi-label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  .kpi-value { font-size: 26px; font-weight: 700; margin: 8px 0 4px; color: var(--text); }
+  .kpi-sub { font-size: 12px; color: var(--text-muted); }
+  .kpi-icon { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 34px; opacity: 0.13; }
+
+  /* ─── Charts Grid ─────────────────────────────────────────── */
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .chart-card { background: var(--card); border-radius: 12px; padding: 24px; box-shadow: var(--shadow); min-width: 0; }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; }
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* ─── Table ───────────────────────────────────────────────── */
+  .table-card { background: var(--card); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 24px; }
+  .table-header { padding: 18px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .table-header h3 { font-size: 14px; font-weight: 600; }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f8f9fa; padding: 10px 14px; text-align: left; font-weight: 600; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafa; }
+
+  /* ─── Badges ──────────────────────────────────────────────── */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-green  { background: #d5f5e3; color: #1e8449; }
+  .badge-blue   { background: #d6eaf8; color: #1a5276; }
+  .badge-yellow { background: #fef9e7; color: #b7950b; }
+  .badge-orange { background: #fdebd0; color: #a04000; }
+  .badge-red    { background: #fadbd8; color: #922b21; }
+  .badge-gray   { background: #eaecee; color: #626567; }
+  .badge-purple { background: #e8daef; color: #6c3483; }
+
+  /* ─── Filter bar ──────────────────────────────────────────── */
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .filter-btn {
+    padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
+    background: var(--card); font-size: 12px; cursor: pointer; transition: all 0.2s; color: var(--text-muted);
+  }
+  .filter-btn:hover, .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+  /* ─── Misc ────────────────────────────────────────────────── */
+  .amount { font-weight: 600; text-align: right; }
+  .amount.positive { color: #1e8449; }
+  .amount.negative { color: #c0392b; }
+  .search-row { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; }
+  .search-input {
+    padding: 7px 14px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; outline: none; width: 100%; max-width: 300px;
+  }
+  .search-input:focus { border-color: var(--primary); }
+  .rank { font-weight: 700; color: var(--text-muted); width: 24px; display: inline-block; }
+  .rank.top { color: #c0392b; }
+  .progress { background: var(--border); border-radius: 4px; height: 6px; margin-top: 4px; }
+  .progress-fill { height: 100%; border-radius: 4px; background: var(--primary); transition: width 0.5s; }
+
+  /* ─── Staff Cell ─────────────────────────────────────────── */
+  .staff-btn {
+    display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+    padding: 3px 8px; border-radius: 6px; transition: background 0.15s;
+  }
+  .staff-btn:hover { background: #fdeaea; }
+  .staff-btn .pencil { font-size: 11px; opacity: 0; transition: opacity 0.15s; }
+  .staff-btn:hover .pencil { opacity: 1; }
+  .no-staff { color: var(--text-muted); font-style: italic; font-size: 12px; }
+
+  /* ─── Modal ───────────────────────────────────────────────── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    z-index: 500; display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: #fff; border-radius: 16px; width: 380px; max-width: calc(100vw - 32px);
+    box-shadow: 0 12px 48px rgba(0,0,0,0.22); overflow: hidden;
+    transform: translateY(12px); transition: transform 0.2s;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-head {
+    padding: 20px 24px 16px; display: flex; align-items: flex-start;
+    justify-content: space-between; border-bottom: 1px solid var(--border);
+  }
+  .modal-title { font-size: 16px; font-weight: 700; }
+  .modal-sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .modal-close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); padding: 2px 6px; border-radius: 6px; }
+  .modal-close-btn:hover { background: var(--border); color: var(--text); }
+  .modal-body { padding: 16px 24px 20px; }
+  .staff-search-inp {
+    width: 100%; padding: 9px 14px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; outline: none; margin-bottom: 10px;
+  }
+  .staff-search-inp:focus { border-color: var(--primary); }
+  .staff-options { max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; }
+  .staff-opt {
+    display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+    cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.15s;
+  }
+  .staff-opt:last-child { border-bottom: none; }
+  .staff-opt:hover { background: #fef5f5; }
+  .staff-opt.current { background: #fdeaea; }
+  .staff-opt-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .staff-opt-name { font-size: 13px; font-weight: 600; }
+  .staff-opt-sub { font-size: 11px; color: var(--text-muted); }
+  .staff-opt-check { margin-left: auto; color: var(--primary); font-size: 14px; font-weight: 700; }
+
+  /* ─── Employee Cards ──────────────────────────────────────── */
+  .emp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+  .emp-card {
+    background: var(--card); border-radius: 12px; padding: 20px; box-shadow: var(--shadow);
+    border-top: 3px solid var(--emp-color, #bdc3c7);
+  }
+  .emp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .emp-avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 700; color: #fff;
+    background: var(--emp-color, #bdc3c7);
+  }
+  .emp-name { font-size: 15px; font-weight: 700; }
+  .emp-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .emp-workload-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .emp-workload-label { font-size: 12px; color: var(--text-muted); }
+  .emp-workload-num { font-size: 22px; font-weight: 700; line-height: 1; }
+  .emp-bar { background: var(--border); border-radius: 6px; height: 8px; overflow: hidden; margin-bottom: 12px; }
+  .emp-bar-fill { height: 100%; border-radius: 6px; transition: width 0.7s ease; background: var(--emp-color, #bdc3c7); }
+  .emp-pills { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .emp-pill { font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+  .emp-level { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 10px; margin-left: auto; }
+  .level-free   { background: #d5f5e3; color: #1e8449; --emp-color: #27ae60; }
+  .level-normal { background: #fef9e7; color: #b7950b; --emp-color: #f39c12; }
+  .level-busy   { background: #fadbd8; color: #922b21; --emp-color: #e74c3c; }
+  .emp-card-actions { display: flex; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+
+  /* ─── Form Modal ──────────────────────────────────────────── */
+  .form-modal {
+    width: 580px;
+    display: flex; flex-direction: column;
+    max-height: min(92vh, 780px);
+  }
+  .form-modal .modal-body { overflow-y: auto; flex: 1; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+  .form-full { grid-column: 1 / -1; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+  .form-label .req { color: var(--primary); }
+  .form-input, .form-select, .form-textarea {
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; outline: none; font-family: inherit; color: var(--text);
+    background: #fff;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(192,57,43,0.08); }
+  .form-textarea { resize: vertical; min-height: 60px; }
+  .form-actions {
+    display: flex; justify-content: flex-end; gap: 10px;
+    padding-top: 14px; margin-top: 4px; border-top: 1px solid var(--border);
+  }
+
+  /* ─── Buttons ─────────────────────────────────────────────── */
+  .btn-primary {
+    padding: 8px 20px; background: var(--primary); color: #fff; border: none;
+    border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s;
+  }
+  .btn-primary:hover { background: var(--primary-light); }
+  .btn-secondary {
+    padding: 8px 20px; background: var(--border); color: var(--text); border: none;
+    border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s;
+  }
+  .btn-secondary:hover { background: #dfe3e8; }
+  .btn-danger {
+    padding: 8px 18px; background: #e74c3c; color: #fff; border: none;
+    border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s;
+  }
+  .btn-danger:hover { background: #c0392b; }
+  .add-btn {
+    padding: 7px 16px; background: var(--primary); color: #fff; border: none;
+    border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background 0.2s; white-space: nowrap; margin-left: auto;
+  }
+  .add-btn:hover { background: var(--primary-light); }
+
+  /* ─── Action Buttons in Table ─────────────────────────────── */
+  .action-cell { display: flex; gap: 5px; align-items: center; }
+  .action-btn {
+    padding: 3px 9px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--card); font-size: 12px; cursor: pointer;
+    transition: all 0.15s; color: var(--text-muted); white-space: nowrap;
+  }
+  .action-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .action-btn.del:hover { background: #e74c3c; border-color: #e74c3c; color: #fff; }
+
+  /* ─── Toast ───────────────────────────────────────────────── */
+  .toast-container {
+    position: fixed; bottom: 24px; right: 24px; z-index: 1000;
+    display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+  }
+  .toast {
+    padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    animation: toastIn 0.25s ease; min-width: 200px;
+  }
+  .toast.success { background: #27ae60; }
+  .toast.error   { background: #e74c3c; }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+  /* ─── Breakpoint: Small screens (≤1100px) ────────────────── */
+  @media (max-width: 1100px) {
+    .sidebar { width: 60px; overflow: hidden; }
+    .sidebar-logo { padding: 14px 0; text-align: center; }
+    .logo-text { display: none; }
+    .nav-label { display: none; }
+    .nav-item { padding: 14px 0; justify-content: center; gap: 0; border-left: none; }
+    .nav-item.active { border-left: none; background: rgba(192,57,43,0.25); }
+    .sidebar-footer { display: none; }
+    .sidebar.expanded { width: 220px; z-index: 300; box-shadow: 4px 0 24px rgba(0,0,0,0.25); }
+    .sidebar.expanded .logo-text { display: inline; }
+    .sidebar.expanded .sidebar-logo { padding: 24px 20px 20px; text-align: left; }
+    .sidebar.expanded .nav-label { display: block; }
+    .sidebar.expanded .nav-item { padding: 12px 20px; justify-content: flex-start; gap: 10px; border-left: 3px solid transparent; }
+    .sidebar.expanded .nav-item.active { border-left-color: var(--primary); background: rgba(192,57,43,0.2); }
+    .sidebar.expanded .sidebar-footer { display: block; }
+    .topbar { display: none; }
+    .main { margin-left: 60px; padding: 24px 20px; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .kpi-grid-3 { grid-template-columns: repeat(2, 1fr); }
+    .charts-grid { grid-template-columns: 1fr; }
+    .chart-card.full { grid-column: auto; }
+    .form-modal { width: calc(100vw - 32px); }
+    .form-grid { grid-template-columns: 1fr; }
+    .form-full { grid-column: auto; }
+  }
+
+  /* ─── Breakpoint: Mobile (≤480px) ────────────────────────── */
+  @media (max-width: 480px) {
+    .main { margin-left: 60px; padding: 20px 12px; }
+    .kpi-card { padding: 14px 14px; }
+    .kpi-value { font-size: 20px; }
+    .kpi-icon { display: none; }
+    .chart-wrap { height: 180px; }
+    .chart-card { padding: 16px; }
+    .page-header h1 { font-size: 18px; }
+    .search-input { max-width: 100%; }
+    .add-btn { font-size: 12px; padding: 6px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Mobile top bar -->
+<div class="topbar">
+  <button class="hamburger" id="hamburger" aria-label="メニュー">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="topbar-title">🌸 さくらリフォーム</div>
+</div>
+
+<!-- Sidebar overlay (mobile) -->
+<div class="sidebar-overlay" id="overlay"></div>
+
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-logo" id="sidebar-toggle" title="メニューを開閉">
+    <div class="sakura">🌸<span class="logo-text"> さくらリフォーム</span></div>
+    <div class="subtitle logo-text">経営ダッシュボード</div>
+  </div>
+  <nav>
+    <div class="nav-item active" data-page="dashboard">
+      <span class="icon">📊</span><span class="nav-label">ダッシュボード</span>
+    </div>
+    <div class="nav-item" data-page="projects">
+      <span class="icon">🏗️</span><span class="nav-label">案件管理</span>
+    </div>
+    <div class="nav-item" data-page="invoices">
+      <span class="icon">💳</span><span class="nav-label">請求・入金</span>
+    </div>
+    <div class="nav-item" data-page="customers">
+      <span class="icon">👥</span><span class="nav-label">顧客台帳</span>
+    </div>
+    <div class="nav-item" data-page="employees">
+      <span class="icon">👷</span><span class="nav-label">社員管理</span>
+    </div>
+    <div class="nav-item" data-page="staff">
+      <span class="icon">📈</span><span class="nav-label">担当者実績</span>
+    </div>
+  </nav>
+  <div class="sidebar-footer">さくらリフォーム 管理システム</div>
+</nav>
+
+<main class="main">
+
+  <!-- ─── Dashboard ─── -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-header">
+      <h1>経営サマリー</h1>
+      <p>受注・パイプライン・入金状況の概要</p>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card" style="--kpi-color:#c0392b">
+        <div class="kpi-label">受注総額</div>
+        <div class="kpi-value" id="kpi-contracted">—</div>
+        <div class="kpi-sub" id="kpi-contracted-count">—</div>
+        <div class="kpi-icon">💰</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:#2980b9">
+        <div class="kpi-label">見込み金額（パイプライン）</div>
+        <div class="kpi-value" id="kpi-pipeline">—</div>
+        <div class="kpi-sub" id="kpi-pipeline-count">—</div>
+        <div class="kpi-icon">📈</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:#27ae60">
+        <div class="kpi-label">入金済み総額</div>
+        <div class="kpi-value" id="kpi-paid">—</div>
+        <div class="kpi-sub" id="kpi-unpaid">—</div>
+        <div class="kpi-icon">✅</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:#e67e22">
+        <div class="kpi-label">案件数（全体）</div>
+        <div class="kpi-value" id="kpi-total">—</div>
+        <div class="kpi-sub" id="kpi-lost">—</div>
+        <div class="kpi-icon">📋</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">案件ステータス別</div>
+        <div class="chart-wrap"><canvas id="chartStatus"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">工事種別 受注・見込み金額</div>
+        <div class="chart-wrap"><canvas id="chartType"></canvas></div>
+      </div>
+      <div class="chart-card full">
+        <div class="chart-title">月別 受注金額（契約済み）</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="chartMonthly"></canvas></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header">
+        <h3>最近の案件（受注済み）</h3>
+      </div>
+      <div class="table-wrap">
+        <table id="tbl-recent">
+          <thead><tr>
+            <th>案件名</th><th>顧客名</th><th>工事種別</th><th>担当</th>
+            <th>着工予定</th><th style="text-align:right">契約金額</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Projects ─── -->
+  <div class="page" id="page-projects">
+    <div class="page-header">
+      <h1>案件管理</h1>
+      <p>全案件の進捗状況・新規案件の追加・編集</p>
+    </div>
+    <div class="search-row">
+      <input class="search-input" id="prj-search" type="text" placeholder="案件名・顧客名で検索...">
+      <button class="add-btn" onclick="openProjectModal()">＋ 新規案件を追加</button>
+    </div>
+    <div class="filter-bar" id="prj-filter">
+      <button class="filter-btn active" data-val="">すべて</button>
+      <button class="filter-btn" data-val="契約済">契約済</button>
+      <button class="filter-btn" data-val="見積提出済">見積提出済</button>
+      <button class="filter-btn" data-val="商談中">商談中</button>
+      <button class="filter-btn" data-val="現地調査済">現地調査済</button>
+      <button class="filter-btn" data-val="初回訪問済">初回訪問済</button>
+      <button class="filter-btn" data-val="失注">失注</button>
+    </div>
+    <div class="table-card">
+      <div class="table-wrap">
+        <table id="tbl-projects">
+          <thead><tr>
+            <th>案件名</th><th>顧客名</th><th>工事種別</th><th>担当</th>
+            <th>ステータス</th><th>確度</th>
+            <th style="text-align:right">概算金額</th><th style="text-align:right">契約金額</th>
+            <th>契約日</th><th>操作</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Invoices ─── -->
+  <div class="page" id="page-invoices">
+    <div class="page-header">
+      <h1>請求・入金管理</h1>
+      <p>請求データの確認・新規追加・編集</p>
+    </div>
+    <div class="kpi-grid kpi-grid-3" style="margin-bottom:20px">
+      <div class="kpi-card" style="--kpi-color:#27ae60">
+        <div class="kpi-label">入金済み</div>
+        <div class="kpi-value" id="inv-paid">—</div>
+        <div class="kpi-icon">✅</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:#e74c3c">
+        <div class="kpi-label">未入金・入金待ち</div>
+        <div class="kpi-value" id="inv-unpaid">—</div>
+        <div class="kpi-icon">⏳</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:#2980b9">
+        <div class="kpi-label">請求件数</div>
+        <div class="kpi-value" id="inv-count">—</div>
+        <div class="kpi-icon">📄</div>
+      </div>
+    </div>
+    <div class="filter-bar" id="inv-filter">
+      <button class="filter-btn active" data-val="">すべて</button>
+      <button class="filter-btn" data-val="入金済">入金済</button>
+      <button class="filter-btn" data-val="未入金">未入金</button>
+      <button class="filter-btn" data-val="入金待ち">入金待ち</button>
+      <button class="add-btn" style="margin-left:auto" onclick="openInvoiceModal()">＋ 新規請求を追加</button>
+    </div>
+    <div class="table-card">
+      <div class="table-wrap">
+        <table id="tbl-invoices">
+          <thead><tr>
+            <th>請求番号</th><th>案件名</th><th>顧客名</th><th>区分</th>
+            <th>請求日</th><th style="text-align:right">請求金額</th>
+            <th>支払期限</th><th>入金状況</th><th>入金日</th><th>操作</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Customers ─── -->
+  <div class="page" id="page-customers">
+    <div class="page-header">
+      <h1>顧客台帳</h1>
+      <p>顧客情報の確認・新規追加・編集</p>
+    </div>
+    <div class="search-row">
+      <input class="search-input" id="cus-search" type="text" placeholder="氏名・住所で検索...">
+      <button class="add-btn" onclick="openCustomerModal()">＋ 新規顧客を追加</button>
+    </div>
+    <div class="table-card">
+      <div class="table-wrap">
+        <table id="tbl-customers">
+          <thead><tr>
+            <th>氏名</th><th>住所</th><th>建物種別</th><th>築年数</th>
+            <th>電話番号</th><th>来店経路</th><th>担当</th><th>操作</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Employees ─── -->
+  <div class="page" id="page-employees">
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <h1>社員管理 · 業務量一覧</h1>
+        <p>担当案件数から各社員の忙しさを把握できます</p>
+      </div>
+      <button class="add-btn" style="margin-left:0;margin-top:4px" onclick="openEmployeeModal()">＋ 新規社員を追加</button>
+    </div>
+    <div class="kpi-grid" style="margin-bottom:24px" id="emp-kpi"></div>
+    <div class="emp-grid" id="emp-grid"></div>
+  </div>
+
+  <!-- ─── Staff ─── -->
+  <div class="page" id="page-staff">
+    <div class="page-header"><h1>担当者別実績</h1></div>
+    <div class="table-card">
+      <div class="table-wrap">
+        <table id="tbl-staff">
+          <thead><tr>
+            <th>順位</th><th>担当者</th><th>担当案件数</th><th>受注件数</th>
+            <th>受注率</th><th style="text-align:right">受注金額</th><th>受注シェア</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ─── Toast Container ─── -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ─── Staff Assignment Modal ─── -->
+<div class="modal-overlay" id="staffModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">担当者を変更</div>
+        <div class="modal-sub" id="modalProjectName"></div>
+      </div>
+      <button class="modal-close-btn" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <input class="staff-search-inp" id="staffSearchInp" type="text" placeholder="名前で検索...">
+      <div class="staff-options" id="staffOptions"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Customer Form Modal ─── -->
+<div class="modal-overlay" id="customerModal">
+  <div class="modal form-modal">
+    <div class="modal-head">
+      <div class="modal-title" id="customerModalTitle">新規顧客を追加</div>
+      <button class="modal-close-btn" onclick="closeFormModal('customerModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="customerForm">
+        <input type="hidden" id="customerIdField">
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label class="form-label">氏名 <span class="req">*</span></label>
+            <input class="form-input" id="cus-name" required placeholder="例：山田 太郎">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">住所</label>
+            <input class="form-input" id="cus-address" placeholder="例：東京都渋谷区...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">建物種別</label>
+            <select class="form-select" id="cus-building_type">
+              <option value="">選択してください</option>
+              <option>戸建て</option>
+              <option>マンション</option>
+              <option>アパート</option>
+              <option>事務所・店舗</option>
+              <option>その他</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">築年数（年）</label>
+            <input class="form-input" type="number" id="cus-age_years" min="0" max="200" placeholder="例：25">
+          </div>
+          <div class="form-group">
+            <label class="form-label">電話番号</label>
+            <input class="form-input" id="cus-phone" placeholder="例：090-1234-5678">
+          </div>
+          <div class="form-group">
+            <label class="form-label">メールアドレス</label>
+            <input class="form-input" type="email" id="cus-email" placeholder="例：yamada@example.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">来店経路</label>
+            <select class="form-select" id="cus-source">
+              <option value="">選択してください</option>
+              <option>チラシ</option>
+              <option>Web</option>
+              <option>紹介</option>
+              <option>看板</option>
+              <option>展示会</option>
+              <option>その他</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">担当者（姓）</label>
+            <input class="form-input" id="cus-staff" placeholder="例：田中">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">備考</label>
+            <textarea class="form-textarea" id="cus-note" rows="2" placeholder="メモ・特記事項など"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="customerDeleteBtn" class="btn-danger" style="display:none;margin-right:auto" onclick="deleteCustomerFromModal()">削除する</button>
+          <button type="button" class="btn-secondary" onclick="closeFormModal('customerModal')">キャンセル</button>
+          <button type="submit" class="btn-primary">保存する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Project Form Modal ─── -->
+<div class="modal-overlay" id="projectModal">
+  <div class="modal form-modal">
+    <div class="modal-head">
+      <div class="modal-title" id="projectModalTitle">新規案件を追加</div>
+      <button class="modal-close-btn" onclick="closeFormModal('projectModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="projectForm">
+        <input type="hidden" id="projectIdField">
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label class="form-label">案件名 <span class="req">*</span></label>
+            <input class="form-input" id="prj-name" required placeholder="例：〇〇様 外壁塗装工事">
+          </div>
+          <div class="form-group">
+            <label class="form-label">顧客名 <span class="req">*</span></label>
+            <input class="form-input" id="prj-customer_name" required placeholder="例：山田 太郎">
+          </div>
+          <div class="form-group">
+            <label class="form-label">工事種別</label>
+            <input class="form-input" id="prj-work_type" list="workTypeList" placeholder="例：外壁塗装">
+            <datalist id="workTypeList">
+              <option value="外壁塗装">
+              <option value="屋根工事">
+              <option value="内装リフォーム">
+              <option value="水回りリフォーム">
+              <option value="外構工事">
+              <option value="その他">
+            </datalist>
+          </div>
+          <div class="form-group">
+            <label class="form-label">担当者（姓）</label>
+            <input class="form-input" id="prj-staff" placeholder="例：田中">
+          </div>
+          <div class="form-group">
+            <label class="form-label">ステータス <span class="req">*</span></label>
+            <select class="form-select" id="prj-status" required>
+              <option value="初回訪問済">初回訪問済</option>
+              <option value="現地調査済">現地調査済</option>
+              <option value="商談中">商談中</option>
+              <option value="見積提出済">見積提出済</option>
+              <option value="契約済">契約済</option>
+              <option value="失注">失注</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">確度</label>
+            <input class="form-input" id="prj-probability" placeholder="例：A（高）">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">現場住所</label>
+            <input class="form-input" id="prj-address" placeholder="例：東京都渋谷区...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">概算金額（円）</label>
+            <input class="form-input" type="number" id="prj-estimate_amount" min="0" placeholder="例：1500000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">契約金額（円）</label>
+            <input class="form-input" type="number" id="prj-contract_amount" min="0" placeholder="例：1450000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">初回訪問日</label>
+            <input class="form-input" type="date" id="prj-first_visit">
+          </div>
+          <div class="form-group">
+            <label class="form-label">着工予定日</label>
+            <input class="form-input" type="date" id="prj-scheduled_start">
+          </div>
+          <div class="form-group">
+            <label class="form-label">契約日</label>
+            <input class="form-input" type="date" id="prj-contract_date">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">備考</label>
+            <textarea class="form-textarea" id="prj-note" rows="2" placeholder="メモ・特記事項など"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="projectDeleteBtn" class="btn-danger" style="display:none;margin-right:auto" onclick="deleteProjectFromModal()">削除する</button>
+          <button type="button" class="btn-secondary" onclick="closeFormModal('projectModal')">キャンセル</button>
+          <button type="submit" class="btn-primary">保存する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Employee Form Modal ─── -->
+<div class="modal-overlay" id="employeeModal">
+  <div class="modal form-modal">
+    <div class="modal-head">
+      <div class="modal-title" id="employeeModalTitle">新規社員を追加</div>
+      <button class="modal-close-btn" onclick="closeFormModal('employeeModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="employeeForm">
+        <input type="hidden" id="employeeIdField">
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label class="form-label">氏名 <span class="req">*</span></label>
+            <input class="form-input" id="emp-name" required placeholder="例：田中 一郎">
+          </div>
+          <div class="form-group">
+            <label class="form-label">部署</label>
+            <input class="form-input" id="emp-department" placeholder="例：営業部">
+          </div>
+          <div class="form-group">
+            <label class="form-label">役職</label>
+            <input class="form-input" id="emp-role" placeholder="例：営業担当">
+          </div>
+          <div class="form-group">
+            <label class="form-label">資格</label>
+            <input class="form-input" id="emp-qualification" placeholder="例：一級施工管理技士">
+          </div>
+          <div class="form-group">
+            <label class="form-label">内線</label>
+            <input class="form-input" id="emp-extension" placeholder="例：101">
+          </div>
+          <div class="form-group">
+            <label class="form-label">携帯電話</label>
+            <input class="form-input" id="emp-mobile" placeholder="例：090-1234-5678">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">メールアドレス</label>
+            <input class="form-input" type="email" id="emp-email" placeholder="例：tanaka@sakura-reform.jp">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="employeeDeleteBtn" class="btn-danger" style="display:none;margin-right:auto" onclick="deleteEmployeeFromModal()">削除する</button>
+          <button type="button" class="btn-secondary" onclick="closeFormModal('employeeModal')">キャンセル</button>
+          <button type="submit" class="btn-primary">保存する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Invoice Form Modal ─── -->
+<div class="modal-overlay" id="invoiceModal">
+  <div class="modal form-modal">
+    <div class="modal-head">
+      <div class="modal-title" id="invoiceModalTitle">新規請求を追加</div>
+      <button class="modal-close-btn" onclick="closeFormModal('invoiceModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="invoiceForm">
+        <input type="hidden" id="invoiceIdField">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">請求番号 <span class="req">*</span></label>
+            <input class="form-input" id="inv-invoice_no" required placeholder="例：INV-2024-001">
+          </div>
+          <div class="form-group">
+            <label class="form-label">区分</label>
+            <input class="form-input" id="inv-billing_type" placeholder="例：工事費">
+          </div>
+          <div class="form-group">
+            <label class="form-label">案件名 <span class="req">*</span></label>
+            <input class="form-input" id="inv-project_name" required placeholder="例：〇〇様 外壁塗装工事">
+          </div>
+          <div class="form-group">
+            <label class="form-label">顧客名</label>
+            <input class="form-input" id="inv-customer_name" placeholder="例：山田 太郎">
+          </div>
+          <div class="form-group">
+            <label class="form-label">請求日</label>
+            <input class="form-input" type="date" id="inv-billing_date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">支払期限</label>
+            <input class="form-input" type="date" id="inv-due_date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">請求金額（円）</label>
+            <input class="form-input" type="number" id="inv-amount" min="0" placeholder="例：1500000">
+          </div>
+          <div class="form-group">
+            <label class="form-label">入金状況</label>
+            <select class="form-select" id="inv-payment_status">
+              <option value="未入金">未入金</option>
+              <option value="入金待ち">入金待ち</option>
+              <option value="入金済">入金済</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">入金日</label>
+            <input class="form-input" type="date" id="inv-payment_date">
+          </div>
+          <div class="form-group form-full">
+            <label class="form-label">備考</label>
+            <textarea class="form-textarea" id="inv-note" rows="2" placeholder="メモ・特記事項など"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="invoiceDeleteBtn" class="btn-danger" style="display:none;margin-right:auto" onclick="deleteInvoiceFromModal()">削除する</button>
+          <button type="button" class="btn-secondary" onclick="closeFormModal('invoiceModal')">キャンセル</button>
+          <button type="submit" class="btn-primary">保存する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+const STATUS_COLOR = {
+  '契約済':    { cls: 'badge-green' },
+  '見積提出済': { cls: 'badge-blue' },
+  '商談中':    { cls: 'badge-yellow' },
+  '現地調査済': { cls: 'badge-orange' },
+  '初回訪問済': { cls: 'badge-purple' },
+  '失注':      { cls: 'badge-gray' },
+};
+const TYPE_COLORS = ['#c0392b','#2980b9','#27ae60','#e67e22','#8e44ad','#16a085','#d35400','#2c3e50'];
+
+function fmt(n) {
+  if (n === null || n === undefined || n === '') return '—';
+  if (n === 0) return '0円';
+  if (n >= 100000000) return (n/100000000).toFixed(1) + '億円';
+  if (n >= 10000) return Math.round(n/10000).toLocaleString() + '万円';
+  return n.toLocaleString() + '円';
+}
+function badge(status) {
+  const s = STATUS_COLOR[status] || { cls: 'badge-gray' };
+  return `<span class="badge ${s.cls}">${status}</span>`;
+}
+function esc(str) {
+  return (str||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+}
+function toInputDate(dateStr) {
+  if (!dateStr) return '';
+  return String(dateStr).replace(/\//g, '-').substring(0, 10);
+}
+
+// ─── Sidebar toggle ────────────────────────────────────────────────────────────
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('overlay');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+
+function openSidebar() {
+  sidebar.classList.add('expanded');
+  overlay.classList.add('show');
+}
+function closeSidebar() {
+  sidebar.classList.remove('expanded');
+  overlay.classList.remove('show');
+}
+
+sidebarToggle.addEventListener('click', () => {
+  if (window.innerWidth > 1100) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelector('[data-page="dashboard"]').classList.add('active');
+    document.getElementById('page-dashboard').classList.add('active');
+    loadPage('dashboard');
+  } else {
+    sidebar.classList.contains('expanded') ? closeSidebar() : openSidebar();
+  }
+});
+overlay.addEventListener('click', closeSidebar);
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('page-' + el.dataset.page).classList.add('active');
+    loadPage(el.dataset.page);
+    closeSidebar();
+  });
+});
+
+const loaded = {};
+function loadPage(page) {
+  if (loaded[page]) return;
+  loaded[page] = true;
+  if (page === 'dashboard') loadDashboard();
+  else if (page === 'projects') loadProjects();
+  else if (page === 'invoices') loadInvoices();
+  else if (page === 'customers') loadCustomers();
+  else if (page === 'employees') loadEmployees();
+  else if (page === 'staff') loadStaff();
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  const [summary, byStatus, byType, monthly, projects] = await Promise.all([
+    fetch('/api/summary').then(r=>r.json()),
+    fetch('/api/projects/by-status').then(r=>r.json()),
+    fetch('/api/projects/by-type').then(r=>r.json()),
+    fetch('/api/projects/monthly').then(r=>r.json()),
+    fetch('/api/projects?status=契約済').then(r=>r.json()),
+  ]);
+
+  document.getElementById('kpi-contracted').textContent = fmt(summary.contracted_total);
+  document.getElementById('kpi-contracted-count').textContent = `${summary.contracted_count}件 受注済み`;
+  document.getElementById('kpi-pipeline').textContent = fmt(summary.pipeline_total);
+  document.getElementById('kpi-pipeline-count').textContent = `${summary.pipeline_count}件 商談中・検討中`;
+  document.getElementById('kpi-paid').textContent = fmt(summary.paid_amount);
+  document.getElementById('kpi-unpaid').textContent = `未入金 ${fmt(summary.unpaid_amount)}`;
+  document.getElementById('kpi-total').textContent = `${summary.total_projects}件`;
+  document.getElementById('kpi-lost').textContent = `失注 ${summary.lost_count}件`;
+
+  new Chart(document.getElementById('chartStatus'), {
+    type: 'doughnut',
+    data: {
+      labels: byStatus.map(r => r.status),
+      datasets: [{ data: byStatus.map(r => r.count), backgroundColor: TYPE_COLORS, borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { font: { size: 12 }, padding: 12 } } }
+    }
+  });
+
+  new Chart(document.getElementById('chartType'), {
+    type: 'bar',
+    data: {
+      labels: byType.map(r => r.work_type),
+      datasets: [{
+        label: '金額（万円）',
+        data: byType.map(r => Math.round(r.total/10000)),
+        backgroundColor: TYPE_COLORS,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { callback: v => v+'万' } } }
+    }
+  });
+
+  new Chart(document.getElementById('chartMonthly'), {
+    type: 'bar',
+    data: {
+      labels: monthly.map(r => r.month),
+      datasets: [{
+        label: '受注金額（万円）',
+        data: monthly.map(r => Math.round(r.total/10000)),
+        backgroundColor: '#c0392b',
+        borderRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { ticks: { callback: v => v+'万' } } }
+    }
+  });
+
+  const tbody = document.querySelector('#tbl-recent tbody');
+  projects.slice(0, 10).forEach(p => {
+    tbody.insertAdjacentHTML('beforeend', `<tr>
+      <td>${p.name}</td>
+      <td>${p.customer_name}</td>
+      <td>${p.work_type||'—'}</td>
+      <td>${p.staff || '—'}</td>
+      <td>${p.scheduled_start || '—'}</td>
+      <td class="amount positive">${fmt(p.contract_amount)}</td>
+    </tr>`);
+  });
+}
+
+// ─── Projects ─────────────────────────────────────────────────────────────────
+let allProjects = [];
+async function loadProjects() {
+  allProjects = await fetch('/api/projects').then(r=>r.json());
+  renderProjects();
+
+  document.querySelectorAll('#prj-filter .filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#prj-filter .filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderProjects();
+    });
+  });
+
+  document.getElementById('prj-search').addEventListener('input', renderProjects);
+}
+
+function renderProjects() {
+  const status = document.querySelector('#prj-filter .filter-btn.active')?.dataset.val || '';
+  const q = document.getElementById('prj-search').value.toLowerCase();
+  const filtered = allProjects.filter(p =>
+    (!status || p.status === status) &&
+    (!q || p.name.toLowerCase().includes(q) || p.customer_name.toLowerCase().includes(q))
+  );
+  const tbody = document.querySelector('#tbl-projects tbody');
+  tbody.innerHTML = '';
+  filtered.forEach(p => {
+    const staffHtml = `<span class="staff-btn" onclick="openStaffModal(${p.id},'${esc(p.name)}','${esc(p.staff||'')}')">
+      ${p.staff ? p.staff : '<span class="no-staff">未割当</span>'}
+      <span class="pencil">✏</span>
+    </span>`;
+    tbody.insertAdjacentHTML('beforeend', `<tr>
+      <td>${p.name}</td>
+      <td>${p.customer_name}</td>
+      <td>${p.work_type||'—'}</td>
+      <td>${staffHtml}</td>
+      <td>${badge(p.status)}</td>
+      <td>${p.probability || '—'}</td>
+      <td class="amount">${fmt(p.estimate_amount)}</td>
+      <td class="amount positive">${p.contract_amount ? fmt(p.contract_amount) : '—'}</td>
+      <td>${p.contract_date || '—'}</td>
+      <td><div class="action-cell">
+        <button class="action-btn" onclick="openProjectModal(${p.id})">✏ 編集</button>
+        <button class="action-btn del" onclick="deleteProject(${p.id},'${esc(p.name)}')">🗑</button>
+      </div></td>
+    </tr>`);
+  });
+}
+
+// ─── Invoices ─────────────────────────────────────────────────────────────────
+let allInvoices = [];
+async function loadInvoices() {
+  allInvoices = await fetch('/api/invoices').then(r=>r.json());
+  updateInvoiceKPIs();
+  renderInvoices();
+
+  document.querySelectorAll('#inv-filter .filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#inv-filter .filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderInvoices();
+    });
+  });
+}
+
+function updateInvoiceKPIs() {
+  const paid = allInvoices.filter(i => i.payment_status === '入金済').reduce((s,i)=>s+(i.amount||0),0);
+  const unpaid = allInvoices.filter(i => i.payment_status !== '入金済').reduce((s,i)=>s+(i.amount||0),0);
+  document.getElementById('inv-paid').textContent = fmt(paid);
+  document.getElementById('inv-unpaid').textContent = fmt(unpaid);
+  document.getElementById('inv-count').textContent = allInvoices.length + '件';
+}
+
+function renderInvoices() {
+  const status = document.querySelector('#inv-filter .filter-btn.active')?.dataset.val || '';
+  const filtered = allInvoices.filter(i => !status || i.payment_status === status);
+  const tbody = document.querySelector('#tbl-invoices tbody');
+  tbody.innerHTML = '';
+  filtered.forEach(i => {
+    const paid = i.payment_status === '入金済';
+    tbody.insertAdjacentHTML('beforeend', `<tr>
+      <td>${i.invoice_no||'—'}</td>
+      <td>${i.project_name||'—'}</td>
+      <td>${i.customer_name||'—'}</td>
+      <td>${i.billing_type||'—'}</td>
+      <td>${i.billing_date || '—'}</td>
+      <td class="amount">${fmt(i.amount)}</td>
+      <td>${i.due_date || '—'}</td>
+      <td>${paid
+        ? '<span class="badge badge-green">入金済</span>'
+        : '<span class="badge badge-red">'+i.payment_status+'</span>'}</td>
+      <td>${i.payment_date || '—'}</td>
+      <td><div class="action-cell">
+        <button class="action-btn" onclick="openInvoiceModal(${i.id})">✏ 編集</button>
+        <button class="action-btn del" onclick="deleteInvoice(${i.id})">🗑</button>
+      </div></td>
+    </tr>`);
+  });
+}
+
+// ─── Customers ────────────────────────────────────────────────────────────────
+let allCustomers = [];
+async function loadCustomers() {
+  allCustomers = await fetch('/api/customers').then(r=>r.json());
+  renderCustomers();
+  document.getElementById('cus-search').addEventListener('input', renderCustomers);
+}
+function renderCustomers() {
+  const q = document.getElementById('cus-search').value.toLowerCase();
+  const filtered = allCustomers.filter(c =>
+    !q || c.name.toLowerCase().includes(q) || (c.address||'').toLowerCase().includes(q)
+  );
+  const tbody = document.querySelector('#tbl-customers tbody');
+  tbody.innerHTML = '';
+  filtered.forEach(c => {
+    tbody.insertAdjacentHTML('beforeend', `<tr>
+      <td>${c.name}</td><td>${c.address||'—'}</td><td>${c.building_type||'—'}</td>
+      <td>${c.age_years ? c.age_years+'年' : '—'}</td>
+      <td>${c.phone||'—'}</td><td>${c.source||'—'}</td><td>${c.staff||'—'}</td>
+      <td><div class="action-cell">
+        <button class="action-btn" onclick="openCustomerModal(${c.id})">✏ 編集</button>
+        <button class="action-btn del" onclick="deleteCustomer(${c.id},'${esc(c.name)}')">🗑</button>
+      </div></td>
+    </tr>`);
+  });
+}
+
+// ─── Staff ────────────────────────────────────────────────────────────────────
+async function loadStaff() {
+  const rows = await fetch('/api/staff/performance').then(r=>r.json());
+  const maxRevenue = rows[0]?.revenue || 1;
+  const tbody = document.querySelector('#tbl-staff tbody');
+  tbody.innerHTML = '';
+  const totalRevenue = rows.reduce((s,r)=>s+r.revenue,0);
+  rows.forEach((r, i) => {
+    const rate = r.total > 0 ? Math.round(r.contracted/r.total*100) : 0;
+    const share = totalRevenue > 0 ? Math.round(r.revenue/totalRevenue*100) : 0;
+    const pct = maxRevenue > 0 ? Math.round(r.revenue/maxRevenue*100) : 0;
+    tbody.insertAdjacentHTML('beforeend', `<tr>
+      <td><span class="rank${i<3?' top':''}">${i+1}</span></td>
+      <td><strong>${r.staff}</strong></td>
+      <td>${r.total}件</td>
+      <td>${r.contracted}件</td>
+      <td>${rate}%</td>
+      <td class="amount positive">${fmt(r.revenue)}</td>
+      <td style="min-width:120px">
+        ${share}%
+        <div class="progress"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </td>
+    </tr>`);
+  });
+}
+
+// ─── Staff Assignment Modal ───────────────────────────────────────────────────
+const staffModal  = document.getElementById('staffModal');
+const modalClose  = document.getElementById('modalClose');
+const staffSearchInp = document.getElementById('staffSearchInp');
+const staffOptions   = document.getElementById('staffOptions');
+
+let modalProjectId   = null;
+let modalCurrentStaff = '';
+let allEmployees = [];
+
+const AVATAR_COLORS = ['#c0392b','#2980b9','#27ae60','#e67e22','#8e44ad','#16a085','#d35400','#2c3e50'];
+function avatarColor(name) { let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))%AVATAR_COLORS.length; return AVATAR_COLORS[h]; }
+
+async function openStaffModal(projectId, projectName, currentStaff) {
+  modalProjectId    = projectId;
+  modalCurrentStaff = currentStaff;
+  document.getElementById('modalProjectName').textContent = projectName;
+  staffSearchInp.value = '';
+
+  if (!allEmployees.length) {
+    allEmployees = await fetch('/api/employees').then(r => r.json());
+  }
+  renderStaffOptions('');
+  staffModal.classList.add('open');
+  staffSearchInp.focus();
+}
+
+function renderStaffOptions(q) {
+  const filtered = allEmployees.filter(e =>
+    !q || e.name.includes(q) || e.name.split(' ')[0].includes(q)
+  );
+  staffOptions.innerHTML = '';
+
+  const noneDiv = document.createElement('div');
+  noneDiv.className = 'staff-opt none-opt' + (modalCurrentStaff === '' ? ' current' : '');
+  noneDiv.innerHTML = `
+    <div class="staff-opt-avatar" style="background:#bdc3c7">—</div>
+    <div><div class="staff-opt-name">未割当</div><div class="staff-opt-sub">担当者を外す</div></div>
+    ${modalCurrentStaff === '' ? '<span class="staff-opt-check">✓</span>' : ''}
+  `;
+  noneDiv.addEventListener('click', () => saveStaff(''));
+  staffOptions.appendChild(noneDiv);
+
+  filtered.forEach(e => {
+    const surname = e.name.split(' ')[0];
+    const isCurrent = surname === modalCurrentStaff;
+    const color = avatarColor(e.name);
+    const div = document.createElement('div');
+    div.className = 'staff-opt' + (isCurrent ? ' current' : '');
+    div.innerHTML = `
+      <div class="staff-opt-avatar" style="background:${color}">${surname[0]}</div>
+      <div>
+        <div class="staff-opt-name">${e.name}</div>
+        <div class="staff-opt-sub">${e.department} · ${e.role || ''}</div>
+      </div>
+      ${isCurrent ? '<span class="staff-opt-check">✓ 現在</span>' : ''}
+    `;
+    div.addEventListener('click', () => saveStaff(surname));
+    staffOptions.appendChild(div);
+  });
+}
+
+async function saveStaff(surname) {
+  await fetch(`/api/projects/${modalProjectId}/staff`, {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ staff: surname || null })
+  });
+  const proj = allProjects.find(p => p.id === modalProjectId);
+  if (proj) proj.staff = surname || null;
+  staffModal.classList.remove('open');
+  renderProjects();
+  if (loaded['employees']) { loaded['employees'] = false; loadEmployees(); }
+  if (loaded['staff'])     { loaded['staff'] = false; loadStaff(); }
+}
+
+staffSearchInp.addEventListener('input', e => renderStaffOptions(e.target.value));
+modalClose.addEventListener('click', () => staffModal.classList.remove('open'));
+staffModal.addEventListener('click', e => { if (e.target === staffModal) staffModal.classList.remove('open'); });
+
+// ─── Employees Workload ───────────────────────────────────────────────────────
+async function loadEmployees() {
+  const emps = await fetch('/api/employees/workload').then(r => r.json());
+  const maxActive = Math.max(...emps.map(e => e.active), 1);
+
+  const withProj = emps.filter(e => e.active > 0);
+  const avgLoad = withProj.length ? (withProj.reduce((s,e)=>s+e.active,0)/withProj.length).toFixed(1) : 0;
+  const busiest = emps[0];
+  const noStaff = (await fetch('/api/projects').then(r=>r.json())).filter(p=>!p.staff && p.status!=='失注').length;
+
+  document.getElementById('emp-kpi').innerHTML = `
+    <div class="kpi-card" style="--kpi-color:#2980b9">
+      <div class="kpi-label">社員数</div>
+      <div class="kpi-value">${emps.length}名</div>
+      <div class="kpi-icon">👷</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:#27ae60">
+      <div class="kpi-label">平均担当案件数</div>
+      <div class="kpi-value">${avgLoad}件</div>
+      <div class="kpi-sub">担当者のいる社員のみ</div>
+      <div class="kpi-icon">📊</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:#e74c3c">
+      <div class="kpi-label">最多担当</div>
+      <div class="kpi-value">${busiest ? busiest.name.split(' ')[0] : '—'}</div>
+      <div class="kpi-sub">${busiest ? busiest.active + '件' : ''}</div>
+      <div class="kpi-icon">🏆</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:#e67e22">
+      <div class="kpi-label">担当者未割当（進行中）</div>
+      <div class="kpi-value">${noStaff}件</div>
+      <div class="kpi-icon">⚠️</div>
+    </div>
+  `;
+
+  const grid = document.getElementById('emp-grid');
+  grid.innerHTML = '';
+  emps.forEach(e => {
+    const pct = maxActive > 0 ? Math.round(e.active / maxActive * 100) : 0;
+    let levelCls, levelTxt;
+    if      (e.active === 0) { levelCls = 'level-free';   levelTxt = '担当なし'; }
+    else if (e.active <= 2)  { levelCls = 'level-free';   levelTxt = '余裕あり'; }
+    else if (e.active <= 4)  { levelCls = 'level-normal'; levelTxt = '通常';    }
+    else                     { levelCls = 'level-busy';   levelTxt = '多忙';    }
+
+    const color = avatarColor(e.name);
+    const empColor = levelCls === 'level-busy' ? '#e74c3c' : levelCls === 'level-normal' ? '#f39c12' : '#27ae60';
+    const pills = [
+      e.in_progress  ? `<span class="emp-pill badge-green"  >契約済 ${e.in_progress}件</span>`  : '',
+      e.negotiating  ? `<span class="emp-pill badge-blue"   >商談中 ${e.negotiating}件</span>`  : '',
+      e.early        ? `<span class="emp-pill badge-orange" >初期   ${e.early}件</span>`        : '',
+      e.lost         ? `<span class="emp-pill badge-gray"   >失注   ${e.lost}件</span>`         : '',
+    ].filter(Boolean).join('');
+
+    grid.insertAdjacentHTML('beforeend', `
+      <div class="emp-card" style="--emp-color:${empColor}">
+        <div class="emp-head">
+          <div class="emp-avatar" style="background:${color}">${e.name[0]}</div>
+          <div>
+            <div class="emp-name">${e.name}</div>
+            <div class="emp-meta">${e.department || ''}${e.role ? ' · ' + e.role : ''}</div>
+          </div>
+        </div>
+        <div class="emp-workload-row">
+          <span class="emp-workload-label">担当案件数（有効）</span>
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span class="emp-workload-num">${e.active}</span>
+            <span style="font-size:12px;color:var(--text-muted)">件</span>
+          </div>
+        </div>
+        <div class="emp-bar"><div class="emp-bar-fill" style="width:${pct}%"></div></div>
+        <div class="emp-pills">
+          ${pills || '<span style="font-size:12px;color:var(--text-muted)">案件なし</span>'}
+          <span class="emp-level ${levelCls}">${levelTxt}</span>
+        </div>
+        <div class="emp-card-actions">
+          <button class="action-btn" style="flex:1" onclick="openEmployeeModal(${e.id})">✏ 編集</button>
+          <button class="action-btn del" onclick="deleteEmployee(${e.id},'${esc(e.name)}')">🗑</button>
+        </div>
+      </div>
+    `);
+  });
+}
+
+// ─── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, type='success') {
+  const container = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  container.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ─── Form Modal Utilities ──────────────────────────────────────────────────────
+function closeFormModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay && overlay.id !== 'staffModal') {
+      overlay.classList.remove('open');
+    }
+  });
+});
+
+// ─── Customers CRUD ───────────────────────────────────────────────────────────
+function openCustomerModal(id=null) {
+  const title = document.getElementById('customerModalTitle');
+  const deleteBtn = document.getElementById('customerDeleteBtn');
+  document.getElementById('customerIdField').value = id || '';
+
+  const fields = ['cus-name','cus-address','cus-building_type','cus-age_years',
+                  'cus-phone','cus-email','cus-source','cus-staff','cus-note'];
+  fields.forEach(f => { document.getElementById(f).value = ''; });
+
+  if (id) {
+    title.textContent = '顧客情報を編集';
+    deleteBtn.style.display = 'inline-block';
+    const c = allCustomers.find(x => x.id === id);
+    if (c) {
+      document.getElementById('cus-name').value = c.name || '';
+      document.getElementById('cus-address').value = c.address || '';
+      document.getElementById('cus-building_type').value = c.building_type || '';
+      document.getElementById('cus-age_years').value = c.age_years || '';
+      document.getElementById('cus-phone').value = c.phone || '';
+      document.getElementById('cus-email').value = c.email || '';
+      document.getElementById('cus-source').value = c.source || '';
+      document.getElementById('cus-staff').value = c.staff || '';
+      document.getElementById('cus-note').value = c.note || '';
+    }
+  } else {
+    title.textContent = '新規顧客を追加';
+    deleteBtn.style.display = 'none';
+  }
+  document.getElementById('customerModal').classList.add('open');
+  document.getElementById('cus-name').focus();
+}
+
+document.getElementById('customerForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('customerIdField').value;
+  const data = {
+    name: document.getElementById('cus-name').value,
+    address: document.getElementById('cus-address').value || null,
+    building_type: document.getElementById('cus-building_type').value || null,
+    age_years: document.getElementById('cus-age_years').value ? +document.getElementById('cus-age_years').value : null,
+    phone: document.getElementById('cus-phone').value || null,
+    email: document.getElementById('cus-email').value || null,
+    source: document.getElementById('cus-source').value || null,
+    staff: document.getElementById('cus-staff').value || null,
+    note: document.getElementById('cus-note').value || null,
+  };
+  const res = await fetch(id ? `/api/customers/${id}` : '/api/customers', {
+    method: id ? 'PUT' : 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  const json = await res.json();
+  if (!res.ok) { showToast(json.error || 'エラーが発生しました', 'error'); return; }
+  closeFormModal('customerModal');
+  showToast(id ? '顧客情報を更新しました' : '新規顧客を追加しました');
+  allCustomers = await fetch('/api/customers').then(r => r.json());
+  renderCustomers();
+});
+
+function deleteCustomerFromModal() {
+  const id = +document.getElementById('customerIdField').value;
+  const name = document.getElementById('cus-name').value;
+  deleteCustomer(id, name);
+}
+
+async function deleteCustomer(id, name) {
+  if (!confirm(`「${name}」を削除しますか？\nこの操作は取り消せません。`)) return;
+  const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+  if (!res.ok) { showToast('削除に失敗しました', 'error'); return; }
+  showToast('顧客を削除しました');
+  closeFormModal('customerModal');
+  allCustomers = allCustomers.filter(c => c.id !== id);
+  renderCustomers();
+}
+
+// ─── Projects CRUD ────────────────────────────────────────────────────────────
+function openProjectModal(id=null) {
+  const title = document.getElementById('projectModalTitle');
+  const deleteBtn = document.getElementById('projectDeleteBtn');
+  document.getElementById('projectIdField').value = id || '';
+
+  const fields = ['prj-name','prj-customer_name','prj-address','prj-work_type','prj-staff',
+                  'prj-probability','prj-estimate_amount','prj-contract_amount',
+                  'prj-first_visit','prj-scheduled_start','prj-contract_date','prj-note'];
+  fields.forEach(f => { document.getElementById(f).value = ''; });
+
+  if (id) {
+    title.textContent = '案件情報を編集';
+    deleteBtn.style.display = 'inline-block';
+    const p = allProjects.find(x => x.id === id);
+    if (p) {
+      document.getElementById('prj-name').value = p.name || '';
+      document.getElementById('prj-customer_name').value = p.customer_name || '';
+      document.getElementById('prj-address').value = p.address || '';
+      document.getElementById('prj-work_type').value = p.work_type || '';
+      document.getElementById('prj-staff').value = p.staff || '';
+      document.getElementById('prj-status').value = p.status || '初回訪問済';
+      document.getElementById('prj-probability').value = p.probability || '';
+      document.getElementById('prj-estimate_amount').value = p.estimate_amount || '';
+      document.getElementById('prj-contract_amount').value = p.contract_amount || '';
+      document.getElementById('prj-first_visit').value = toInputDate(p.first_visit);
+      document.getElementById('prj-scheduled_start').value = toInputDate(p.scheduled_start);
+      document.getElementById('prj-contract_date').value = toInputDate(p.contract_date);
+      document.getElementById('prj-note').value = p.note || '';
+    }
+  } else {
+    title.textContent = '新規案件を追加';
+    deleteBtn.style.display = 'none';
+    document.getElementById('prj-status').value = '初回訪問済';
+  }
+  document.getElementById('projectModal').classList.add('open');
+  document.getElementById('prj-name').focus();
+}
+
+document.getElementById('projectForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('projectIdField').value;
+  const data = {
+    name: document.getElementById('prj-name').value,
+    customer_name: document.getElementById('prj-customer_name').value,
+    address: document.getElementById('prj-address').value || null,
+    work_type: document.getElementById('prj-work_type').value || null,
+    staff: document.getElementById('prj-staff').value || null,
+    status: document.getElementById('prj-status').value,
+    probability: document.getElementById('prj-probability').value || null,
+    estimate_amount: document.getElementById('prj-estimate_amount').value ? +document.getElementById('prj-estimate_amount').value : null,
+    contract_amount: document.getElementById('prj-contract_amount').value ? +document.getElementById('prj-contract_amount').value : null,
+    first_visit: document.getElementById('prj-first_visit').value || null,
+    scheduled_start: document.getElementById('prj-scheduled_start').value || null,
+    contract_date: document.getElementById('prj-contract_date').value || null,
+    note: document.getElementById('prj-note').value || null,
+  };
+  const res = await fetch(id ? `/api/projects/${id}` : '/api/projects', {
+    method: id ? 'PUT' : 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  const json = await res.json();
+  if (!res.ok) { showToast(json.error || 'エラーが発生しました', 'error'); return; }
+  closeFormModal('projectModal');
+  showToast(id ? '案件情報を更新しました' : '新規案件を追加しました');
+  allProjects = await fetch('/api/projects').then(r => r.json());
+  renderProjects();
+  if (loaded['dashboard']) loaded['dashboard'] = false;
+  if (loaded['staff']) { loaded['staff'] = false; loadStaff(); }
+});
+
+function deleteProjectFromModal() {
+  const id = +document.getElementById('projectIdField').value;
+  const name = document.getElementById('prj-name').value;
+  deleteProject(id, name);
+}
+
+async function deleteProject(id, name) {
+  if (!confirm(`「${name}」を削除しますか？\nこの操作は取り消せません。`)) return;
+  const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+  if (!res.ok) { showToast('削除に失敗しました', 'error'); return; }
+  showToast('案件を削除しました');
+  closeFormModal('projectModal');
+  allProjects = allProjects.filter(p => p.id !== id);
+  renderProjects();
+  if (loaded['dashboard']) loaded['dashboard'] = false;
+  if (loaded['employees']) { loaded['employees'] = false; loadEmployees(); }
+  if (loaded['staff']) { loaded['staff'] = false; loadStaff(); }
+}
+
+// ─── Employees CRUD ───────────────────────────────────────────────────────────
+function openEmployeeModal(id=null) {
+  const title = document.getElementById('employeeModalTitle');
+  const deleteBtn = document.getElementById('employeeDeleteBtn');
+  document.getElementById('employeeIdField').value = id || '';
+
+  const fields = ['emp-name','emp-department','emp-role','emp-qualification',
+                  'emp-extension','emp-mobile','emp-email'];
+  fields.forEach(f => { document.getElementById(f).value = ''; });
+
+  if (id) {
+    title.textContent = '社員情報を編集';
+    deleteBtn.style.display = 'inline-block';
+    fetch('/api/employees').then(r=>r.json()).then(emps => {
+      const e = emps.find(x => x.id === id);
+      if (e) {
+        document.getElementById('emp-name').value = e.name || '';
+        document.getElementById('emp-department').value = e.department || '';
+        document.getElementById('emp-role').value = e.role || '';
+        document.getElementById('emp-qualification').value = e.qualification || '';
+        document.getElementById('emp-extension').value = e.extension || '';
+        document.getElementById('emp-mobile').value = e.mobile || '';
+        document.getElementById('emp-email').value = e.email || '';
+      }
+    });
+  } else {
+    title.textContent = '新規社員を追加';
+    deleteBtn.style.display = 'none';
+  }
+  document.getElementById('employeeModal').classList.add('open');
+  document.getElementById('emp-name').focus();
+}
+
+document.getElementById('employeeForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('employeeIdField').value;
+  const data = {
+    name: document.getElementById('emp-name').value,
+    department: document.getElementById('emp-department').value || null,
+    role: document.getElementById('emp-role').value || null,
+    qualification: document.getElementById('emp-qualification').value || null,
+    extension: document.getElementById('emp-extension').value || null,
+    mobile: document.getElementById('emp-mobile').value || null,
+    email: document.getElementById('emp-email').value || null,
+  };
+  const res = await fetch(id ? `/api/employees/${id}` : '/api/employees', {
+    method: id ? 'PUT' : 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  const json = await res.json();
+  if (!res.ok) { showToast(json.error || 'エラーが発生しました', 'error'); return; }
+  closeFormModal('employeeModal');
+  showToast(id ? '社員情報を更新しました' : '新規社員を追加しました');
+  allEmployees = [];
+  loaded['employees'] = false;
+  loadEmployees();
+  loaded['employees'] = true;
+});
+
+function deleteEmployeeFromModal() {
+  const id = +document.getElementById('employeeIdField').value;
+  const name = document.getElementById('emp-name').value;
+  deleteEmployee(id, name);
+}
+
+async function deleteEmployee(id, name) {
+  if (!confirm(`「${name}」を削除しますか？\nこの社員が担当している案件の担当者が未割当になります。`)) return;
+  const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' });
+  if (!res.ok) { showToast('削除に失敗しました', 'error'); return; }
+  showToast('社員を削除しました');
+  closeFormModal('employeeModal');
+  allEmployees = [];
+  loaded['employees'] = false;
+  loadEmployees();
+  loaded['employees'] = true;
+  if (loaded['projects']) {
+    allProjects = await fetch('/api/projects').then(r=>r.json());
+    renderProjects();
+  }
+  if (loaded['staff']) { loaded['staff'] = false; loadStaff(); }
+}
+
+// ─── Invoices CRUD ────────────────────────────────────────────────────────────
+function openInvoiceModal(id=null) {
+  const title = document.getElementById('invoiceModalTitle');
+  const deleteBtn = document.getElementById('invoiceDeleteBtn');
+  document.getElementById('invoiceIdField').value = id || '';
+
+  const fields = ['inv-invoice_no','inv-project_name','inv-customer_name','inv-billing_type',
+                  'inv-billing_date','inv-amount','inv-due_date','inv-payment_date','inv-note'];
+  fields.forEach(f => { document.getElementById(f).value = ''; });
+  document.getElementById('inv-payment_status').value = '未入金';
+
+  if (id) {
+    title.textContent = '請求情報を編集';
+    deleteBtn.style.display = 'inline-block';
+    const inv = allInvoices.find(x => x.id === id);
+    if (inv) {
+      document.getElementById('inv-invoice_no').value = inv.invoice_no || '';
+      document.getElementById('inv-project_name').value = inv.project_name || '';
+      document.getElementById('inv-customer_name').value = inv.customer_name || '';
+      document.getElementById('inv-billing_type').value = inv.billing_type || '';
+      document.getElementById('inv-billing_date').value = toInputDate(inv.billing_date);
+      document.getElementById('inv-amount').value = inv.amount || '';
+      document.getElementById('inv-due_date').value = toInputDate(inv.due_date);
+      document.getElementById('inv-payment_status').value = inv.payment_status || '未入金';
+      document.getElementById('inv-payment_date').value = toInputDate(inv.payment_date);
+      document.getElementById('inv-note').value = inv.note || '';
+    }
+  } else {
+    title.textContent = '新規請求を追加';
+    deleteBtn.style.display = 'none';
+  }
+  document.getElementById('invoiceModal').classList.add('open');
+  document.getElementById('inv-invoice_no').focus();
+}
+
+document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('invoiceIdField').value;
+  const data = {
+    invoice_no: document.getElementById('inv-invoice_no').value,
+    project_name: document.getElementById('inv-project_name').value,
+    customer_name: document.getElementById('inv-customer_name').value || null,
+    billing_type: document.getElementById('inv-billing_type').value || null,
+    billing_date: document.getElementById('inv-billing_date').value || null,
+    amount: document.getElementById('inv-amount').value ? +document.getElementById('inv-amount').value : null,
+    due_date: document.getElementById('inv-due_date').value || null,
+    payment_status: document.getElementById('inv-payment_status').value,
+    payment_date: document.getElementById('inv-payment_date').value || null,
+    note: document.getElementById('inv-note').value || null,
+  };
+  const res = await fetch(id ? `/api/invoices/${id}` : '/api/invoices', {
+    method: id ? 'PUT' : 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  const json = await res.json();
+  if (!res.ok) { showToast(json.error || 'エラーが発生しました', 'error'); return; }
+  closeFormModal('invoiceModal');
+  showToast(id ? '請求情報を更新しました' : '新規請求を追加しました');
+  allInvoices = await fetch('/api/invoices').then(r => r.json());
+  updateInvoiceKPIs();
+  renderInvoices();
+  if (loaded['dashboard']) loaded['dashboard'] = false;
+});
+
+function deleteInvoiceFromModal() {
+  const id = +document.getElementById('invoiceIdField').value;
+  deleteInvoice(id);
+}
+
+async function deleteInvoice(id) {
+  if (!confirm('この請求データを削除しますか？\nこの操作は取り消せません。')) return;
+  const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
+  if (!res.ok) { showToast('削除に失敗しました', 'error'); return; }
+  showToast('請求データを削除しました');
+  closeFormModal('invoiceModal');
+  allInvoices = allInvoices.filter(i => i.id !== id);
+  updateInvoiceKPIs();
+  renderInvoices();
+  if (loaded['dashboard']) loaded['dashboard'] = false;
+}
+
+// Initial load
+loadDashboard();
+loaded['dashboard'] = true;
+</script>
+</body>
+</html>

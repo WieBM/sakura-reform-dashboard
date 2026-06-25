@@ -1,0 +1,1 @@
+- [Sakura Dashboard Audit Context](project_sakura_audit.md) — Playwright not installed; recurring bugs in chart re-init, hamburger listener, loadEmployees race; 2026-06-25 audit

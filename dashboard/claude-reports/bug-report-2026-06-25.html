@@ -1,0 +1,852 @@
+<title>さくらリフォーム — CRUD Audit Bug Report</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #F0F2F5;
+    --surface:   #FFFFFF;
+    --border:    #E1E4EB;
+    --text:      #0F1117;
+    --text-2:    #5A6272;
+    --text-3:    #9198A6;
+    --high:      #C8213A;
+    --high-bg:   #FFF0F2;
+    --high-mid:  #F8C8D0;
+    --med:       #D06018;
+    --med-bg:    #FFF5ED;
+    --med-mid:   #F8D5B4;
+    --low:       #16873A;
+    --low-bg:    #EDFAF3;
+    --low-mid:   #B6E8CC;
+    --pass:      #1D4ED8;
+    --pass-bg:   #EFF4FF;
+    --stripe-w:  4px;
+    --radius:    8px;
+    --shadow:    0 1px 3px rgba(0,0,0,.08), 0 1px 1px rgba(0,0,0,.04);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+                 "Noto Sans JP", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.55;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Header ─────────────────────────────────── */
+  .header {
+    background: var(--text);
+    color: #fff;
+    padding: 20px 32px 18px;
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .header-brand { display: flex; flex-direction: column; gap: 3px; }
+  .header-eyebrow {
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.45);
+    font-weight: 500;
+  }
+  .header-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1.2;
+  }
+  .header-title span {
+    color: #E8627A;
+  }
+  .header-meta {
+    margin-left: auto;
+    text-align: right;
+    font-size: 12px;
+    color: rgba(255,255,255,.5);
+    line-height: 1.6;
+  }
+  .header-meta strong { color: rgba(255,255,255,.85); font-size: 13px; }
+
+  /* ── Summary bar ─────────────────────────────── */
+  .summary-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .stat {
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .12s;
+    user-select: none;
+  }
+  .stat:first-child { padding-left: 0; }
+  .stat:last-child  { border-right: none; }
+  .stat:hover { background: var(--bg); }
+  .stat.active { background: var(--bg); }
+  .stat-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .stat-dot.high  { background: var(--high); }
+  .stat-dot.med   { background: var(--med); }
+  .stat-dot.low   { background: var(--low); }
+  .stat-dot.pass  { background: var(--pass); }
+  .stat-dot.all   { background: var(--text-2); }
+  .stat-count {
+    font-size: 20px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.03em;
+    line-height: 1;
+  }
+  .stat-count.high { color: var(--high); }
+  .stat-count.med  { color: var(--med); }
+  .stat-count.low  { color: var(--low); }
+  .stat-count.pass { color: var(--pass); }
+  .stat-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-2);
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    line-height: 1.3;
+  }
+
+  /* ── Layout ──────────────────────────────────── */
+  .content {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 28px 32px 64px;
+  }
+
+  /* ── Section headings ────────────────────────── */
+  .section-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 32px 0 12px;
+  }
+  .section-head:first-of-type { margin-top: 0; }
+  .section-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .section-badge.high { background: var(--high-bg); color: var(--high); border: 1px solid var(--high-mid); }
+  .section-badge.med  { background: var(--med-bg);  color: var(--med);  border: 1px solid var(--med-mid); }
+  .section-badge.low  { background: var(--low-bg);  color: var(--low);  border: 1px solid var(--low-mid); }
+  .section-badge.pass { background: var(--pass-bg); color: var(--pass); border: 1px solid #C7D8FB; }
+  .section-rule { flex: 1; height: 1px; background: var(--border); }
+
+  /* ── Bug card ─────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 10px;
+    overflow: hidden;
+    display: flex;
+  }
+  .card-stripe {
+    width: var(--stripe-w);
+    flex-shrink: 0;
+  }
+  .card-stripe.high { background: var(--high); }
+  .card-stripe.med  { background: var(--med); }
+  .card-stripe.low  { background: var(--low); }
+
+  .card-inner { flex: 1; min-width: 0; }
+
+  .card-summary {
+    padding: 14px 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .card-summary:hover { background: #FAFBFC; }
+
+  .bug-id {
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-3);
+    letter-spacing: .04em;
+    white-space: nowrap;
+    padding-top: 1px;
+    flex-shrink: 0;
+  }
+  .card-main { flex: 1; min-width: 0; }
+  .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text);
+    text-wrap: balance;
+  }
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 7px;
+  }
+  .tag {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: .01em;
+  }
+  .tag.page { background: #F0F2F5; color: var(--text-2); }
+  .tag.cat  { background: #EEF0F7; color: #4B5680; }
+
+  .expand-icon {
+    color: var(--text-3);
+    font-size: 13px;
+    flex-shrink: 0;
+    transition: transform .15s;
+    margin-top: 1px;
+    padding: 2px;
+  }
+  .card.open .expand-icon { transform: rotate(90deg); }
+
+  /* ── Card detail ─────────────────────────────── */
+  .card-detail {
+    display: none;
+    padding: 0 18px 18px 46px;
+    border-top: 1px solid var(--border);
+  }
+  .card.open .card-detail { display: block; }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 4px 14px;
+    font-size: 13px;
+    padding-top: 14px;
+  }
+  .detail-label {
+    color: var(--text-3);
+    font-weight: 500;
+    letter-spacing: .02em;
+    padding-top: 1px;
+    align-self: start;
+  }
+  .detail-value { color: var(--text); line-height: 1.55; }
+  .detail-value ol, .detail-value ul { padding-left: 18px; }
+  .detail-value li { margin-bottom: 2px; }
+
+  code {
+    font-family: "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    font-size: 12px;
+    background: #F0F2F5;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: #B8213B;
+  }
+
+  pre {
+    font-family: "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
+    font-size: 12px;
+    background: #F7F8FA;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-top: 8px;
+    overflow-x: auto;
+    line-height: 1.6;
+    color: #2E3440;
+  }
+
+  /* ── Passed checks ───────────────────────────── */
+  .pass-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 8px;
+  }
+  .pass-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  .pass-check {
+    color: var(--low);
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── Filter active state ─────────────────────── */
+  .bug-group { transition: opacity .15s; }
+  .bug-group.hidden { display: none; }
+
+  /* ── Responsive ──────────────────────────────── */
+  @media (max-width: 640px) {
+    .header { padding: 16px 16px 14px; }
+    .summary-bar { padding: 0 16px; overflow-x: auto; }
+    .stat { padding: 12px 16px; }
+    .content { padding: 20px 16px 48px; }
+    .card-detail { padding-left: 18px; }
+  }
+</style>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-brand">
+    <span class="header-eyebrow">UX &amp; CRUD Audit Report</span>
+    <h1 class="header-title"><span>さくら</span>リフォーム 経営ダッシュボード</h1>
+  </div>
+  <div class="header-meta">
+    <strong>2026-06-25</strong><br>
+    静的解析 + API コード監査<br>
+    対象: server.js / index.html / db.js
+  </div>
+</header>
+
+<!-- SUMMARY BAR -->
+<nav class="summary-bar" id="summary-bar">
+  <div class="stat active" data-filter="all" onclick="filterBugs('all', this)">
+    <div class="stat-dot all"></div>
+    <div>
+      <div class="stat-count">12</div>
+      <div class="stat-label">Total</div>
+    </div>
+  </div>
+  <div class="stat" data-filter="high" onclick="filterBugs('high', this)">
+    <div class="stat-dot high"></div>
+    <div>
+      <div class="stat-count high">5</div>
+      <div class="stat-label">High</div>
+    </div>
+  </div>
+  <div class="stat" data-filter="med" onclick="filterBugs('med', this)">
+    <div class="stat-dot med"></div>
+    <div>
+      <div class="stat-count med">5</div>
+      <div class="stat-label">Medium</div>
+    </div>
+  </div>
+  <div class="stat" data-filter="low" onclick="filterBugs('low', this)">
+    <div class="stat-dot low"></div>
+    <div>
+      <div class="stat-count low">2</div>
+      <div class="stat-label">Low</div>
+    </div>
+  </div>
+  <div class="stat" data-filter="pass" onclick="filterBugs('pass', this)">
+    <div class="stat-dot pass"></div>
+    <div>
+      <div class="stat-count pass">22</div>
+      <div class="stat-label">Passed</div>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main class="content">
+
+  <!-- HIGH SEVERITY -->
+  <div class="section-head bug-group" data-group="high">
+    <span class="section-badge high">High — 5件</span>
+    <div class="section-rule"></div>
+  </div>
+
+  <!-- BUG-1 -->
+  <div class="card bug-group" data-group="high" onclick="toggleCard(this)">
+    <div class="card-stripe high"></div>
+    <div class="card-inner">
+      <div class="card-summary">
+        <span class="bug-id">BUG-01</span>
+        <div class="card-main">
+          <div class="card-title">ダッシュボード再訪時にチャートがクラッシュ — "Canvas is already in use"</div>
+          <div class="card-tags">
+            <span class="tag page">ダッシュボード</span>
+            <span class="tag cat">Frontend JS</span>
+          </div>
+        </div>
+        <span class="expand-icon">▶</span>
+      </div>
+      <div class="card-detail">
+        <div class="detail-grid">
+          <span class="detail-label">原因</span>
+          <span class="detail-value">案件/請求CRUD後に <code>loaded['dashboard']</code> が <code>false</code> にリセットされ、再訪時に同じ <code>&lt;canvas&gt;</code> に対して <code>new Chart(...)</code> が再実行される。既存インスタンスを <code>.destroy()</code> せずに再生成するため Chart.js が例外を投げる。</span>
+
+          <span class="detail-label">再現手順</span>
+          <div class="detail-value">
+            <ol>
+              <li>ダッシュボードを開き、チャートが表示されることを確認する</li>
+              <li>案件管理で任意の案件を新規追加または編集・保存する</li>
+              <li>サイドバーからダッシュボードに戻る</li>
+              <li>コンソールに <em>"Canvas is already in use. Chart with ID '0' must be destroyed…"</em> が出力される</li>
+            </ol>
+          </div>
+
+          <span class="detail-label">修正案</span>
+          <div class="detail-value">
+            チャートインスタンスをモジュールスコープ変数に保持し、<code>new Chart()</code> 前に <code>.destroy()</code> を呼ぶ。
+<pre>let chartStatusInst = null;
+
+// loadDashboard() 内:
+if (chartStatusInst) chartStatusInst.destroy();
+chartStatusInst = new Chart(
+  document.getElementById('chartStatus'), { ... }
+);</pre>
+            <code>chartTypeInst</code>・<code>chartMonthlyInst</code> も同様。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG-2 -->
+  <div class="card bug-group" data-group="high" onclick="toggleCard(this)">
+    <div class="card-stripe high"></div>
+    <div class="card-inner">
+      <div class="card-summary">
+        <span class="bug-id">BUG-02</span>
+        <div class="card-main">
+          <div class="card-title">モバイルのハンバーガーボタンにイベントリスナーが未設定 — メニュー操作不能</div>
+          <div class="card-tags">
+            <span class="tag page">全ページ (モバイル)</span>
+            <span class="tag cat">Mobile UX</span>
+          </div>
+        </div>
+        <span class="expand-icon">▶</span>
+      </div>
+      <div class="card-detail">
+        <div class="detail-grid">
+          <span class="detail-label">原因</span>
+          <span class="detail-value"><code>#hamburger</code> ボタンに <code>click</code> イベントリスナーが一切なく、タップしても何も起きない。加えて <code>.topbar</code> の CSS がデフォルト <code>display: none</code> のまま、どのメディアクエリでも <code>display: flex</code> に上書きされないため、ボタン自体が表示されない（BUG-10 と連動）。</span>
+
+          <span class="detail-label">修正案</span>
+          <div class="detail-value">
+<pre>// JS — サイドバー初期化付近に追加
+document.getElementById('hamburger')
+  .addEventListener('click', openSidebar);
+</pre>
+<pre>/* CSS — @media (max-width: 480px) ブロックに追加 */
+.topbar { display: flex; }
+.sidebar { display: none; }
+.main { margin-left: 0; padding-top: 68px; }</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG-3 -->
+  <div class="card bug-group" data-group="high" onclick="toggleCard(this)">
+    <div class="card-stripe high"></div>
+    <div class="card-inner">
+      <div class="card-summary">
+        <span class="bug-id">BUG-03</span>
+        <div class="card-main">
+          <div class="card-title"><code>loadEmployees()</code> の async レースコンディション — <code>loaded</code> フラグがフェッチ完了前にセットされる</div>
+          <div class="card-tags">
+            <span class="tag page">社員管理</span>
+            <span class="tag cat">Frontend JS</span>
+          </div>
+        </div>
+        <span class="expand-icon">▶</span>
+      </div>
+      <div class="card-detail">
+        <div class="detail-grid">
+          <span class="detail-label">原因</span>
+          <span class="detail-value">社員 CRUD 保存後のコードが <code>loadEmployees()</code> を呼んだ直後（非同期完了前）に <code>loaded['employees'] = true</code> を同期的にセットする。低速ネットワークや高負荷時、フェッチ完了前にユーザーが画面を切り替えると、次の訪問で <code>loaded</code> が <code>true</code> のまま読み込みがスキップされ古いデータが表示される。</span>
+
+          <span class="detail-label">修正案</span>
+          <div class="detail-value">
+            手動の <code>loaded['employees'] = true</code> 行を削除し、<code>loadEmployees()</code> 内部のフェッチ完了時に設定するか、呼び出し側で <code>await</code> する。
+<pre>// CRUD 保存後:
+allEmployees = [];
+await loadEmployees(); // loaded フラグは関数内部で管理</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG-4 -->
+  <div class="card bug-group" data-group="high" onclick="toggleCard(this)">
+    <div class="card-stripe high"></div>
+    <div class="card-inner">
+      <div class="card-summary">
+        <span class="bug-id">BUG-04</span>
+        <div class="card-main">
+          <div class="card-title">数値フィールドが 0 の場合、編集モーダルで値が消える — データ上書き危険</div>
+          <div class="card-tags">
+            <span class="tag page">案件管理 / 請求・入金 / 顧客台帳</span>
+            <span class="tag cat">Data / UX</span>
+          </div>
+        </div>
+        <span class="expand-icon">▶</span>
+      </div>
+      <div class="card-detail">
+        <div class="detail-grid">
+          <span class="detail-label">原因</span>
+          <span class="detail-value"><code>p.estimate_amount || ''</code> のように falsy 判定しているため、値が <code>0</code> の場合 <code>0 || '' → ''</code> となり空欄になる。そのまま保存すると <code>null</code> がサーバーに送信される。</span>
+
+          <span class="detail-label">影響フィールド</span>
+          <div class="detail-value">
+            <code>estimate_amount</code>・<code>contract_amount</code>（案件）、<code>amount</code>（請求）、<code>age_years</code>（顧客）
+          </div>
+
+          <span class="detail-label">修正案</span>
+          <div class="detail-value">
+<pre>// 変更前:
+input.value = p.estimate_amount || '';
+
+// 変更後:
+input.value = (p.estimate_amount !== null
+  &amp;&amp; p.estimate_amount !== undefined)
+  ? p.estimate_amount : '';</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG-5 -->
+  <div class="card bug-group" data-group="high" onclick="toggleCard(this)">
+    <div class="card-stripe high"></div>
+    <div class="card-inner">
+      <div class="card-summary">
+        <span class="bug-id">BUG-05</span>
+        <div class="card-main">
+          <div class="card-title">社員編集モーダルを開くたびに <code>/api/employees</code> を再フェッチ — キャッシュ未使用</div>
+          <div class="card-tags">
+            <span class="tag page">社員管理</span>
+            <span class="tag cat">Performance</span>
+          </div>
+        </div>
+        <span class="expand-icon">▶</span>
+      </div>
+      <div class="card-detail">
+        <div class="detail-grid">
+          <span class="detail-label">原因</span>
+          <span class="detail-value"><code>openEmployeeModal(id)</code> が毎回 <code>fetch('/api/employees')</code> を呼ぶ。顧客・案件・請求の各モーダルはメモリキャッシュ（<code>allCustomers</code> 等）から検索するが、社員モーダルのみ例外的に毎回全件取得している。</span>
+
+          <span class="detail-label">修正案</span>
+          <div class="detail-value">
+            <code>loadEmployees()</code> 実行時に <code>allEmployeesFull = emps</code> として保持し、モーダル内では <code>allEmployeesFull.find(x =&gt; x.id === id)</code> で参照する。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MEDIUM SEVERITY -->
+  <div class="section-head bug-group" data-group="med">
+    <span class="section-badge med">Medium — 5件</span>
+    <div class="section-rule"></div>
+  </div>
+
+  <!-- BUG-6 -->
+  <div class="card bug-group" data-group="med" onclick="toggleCard(this)">
+    <div class="card-stripe med"></div>
+    <div class="card-inner">
+      <div class="card-summary">
+        <span class="bug-id">BUG-06</span>
+        <div class="card-main">
+          <div class="card-title">ユーザー入力値が HTML エスケープなしで <code>insertAdjacentHTML</code> に挿入 — Stored XSS</div>
+          <div class="card-tags">
+            <span class="tag page">案件管理 / 顧客台帳 / 請求・入金 / 社員管理</span>
+            <span class="tag cat">Security</span>
+          </div>
+        </div>
+        <span class="expand-icon">▶</span>
+      </div>
+      <div class="card-detail">
+        <div class="detail-grid">
+          <span class="detail-label">原因</span>
+          <span class="detail-value"><code>p.name</code>・<code>c.name</code>・<code>e.name</code> 等がテンプレートリテラルでそのまま HTML に挿入される。<code>&lt;img src=x onerror=alert(1)&gt;</code> を案件名に保存するとスクリプトが実行される。既存の <code>esc()</code> はシングルクォートのみエスケープするため不十分。</span>
+
+          <span class="detail-label">修正案</span>
+          <div class="detail-value">
+<pre>function html(str) {
+  return (str || '')
+    .replace(/&amp;/g, '&amp;amp;')
+    .replace(/&lt;/g,  '&amp;lt;')
+    .replace(/&gt;/g,  '&amp;gt;')
+    .replace(/"/g,  '&amp;quot;');
+}
+// 使用例: &lt;td&gt;${html(p.name)}&lt;/td&gt;</pre>
+            全テーブルセルの <code>insertAdjacentHTML</code> で <code>html()</code> を適用。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG-7 -->
+  <div class="card bug-group" data-group="med" onclick="toggleCard(this)">
+    <div class="card-stripe med"></div>
+    <div class="card-inner">
+      <div class="card-summary">
+        <span class="bug-id">BUG-07</span>
+        <div class="card-main">
+          <div class="card-title">請求削除の確認ダイアログに請求番号が表示されない — 誤操作リスク</div>
+          <div class="card-tags">
+            <span class="tag page">請求・入金</span>
+            <span class="tag cat">UX</span>
+          </div>
+        </div>
+        <span class="expand-icon">▶</span>
+      </div>
+      <div class="card-detail">
+        <div class="detail-grid">
+          <span class="detail-label">現状</span>
+          <span class="detail-value">「この請求データを削除しますか？」のみ表示。どの請求かが確認できない。案件・顧客の削除ダイアログは名称を含む（例: 「田中様邸 外壁工事」を削除しますか？）</span>
+
+          <span class="detail-label">修正案</span>
+          <div class="detail-value">
+<pre>// ボタン:
+onclick="deleteInvoice(${i.id}, '${esc(i.invoice_no||'')}')"
+
+// 関数:
+async function deleteInvoice(id, invoiceNo) {
+  if (!confirm(`「${invoiceNo}」を削除しますか？\nこの操作は取り消せません。`)) return;
+  ...
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG-8 -->
+  <div class="card bug-group" data-group="med" onclick="toggleCard(this)">
+    <div class="card-stripe med"></div>
+    <div class="card-inner">
+      <div class="card-summary">
+        <span class="bug-id">BUG-08</span>
+        <div class="card-main">
+          <div class="card-title"><code>prj-status</code> がフィールドリセット対象に含まれない — 前回の値が残る</div>
+          <div class="card-tags">
+            <span class="tag page">案件管理</span>
+            <span class="tag cat">Bug</span>
+          </div>
+        </div>
+        <span class="expand-icon">▶</span>
+      </div>
+      <div class="card-detail">
+        <div class="detail-grid">
+          <span class="detail-label">原因</span>
+          <span class="detail-value"><code>openProjectModal()</code> のフィールドクリアループに <code>'prj-status'</code> が含まれていない。編集モーダルで「失注」に変更してキャンセル後、別の案件を編集すると「失注」が残る可能性がある（新規モードは <code>else</code> ブランチで明示的に設定するため影響は限定的だが、防御的に修正が望ましい）。</span>
+
+          <span class="detail-label">修正案</span>
+          <span class="detail-value">フィールドの配列に <code>'prj-status'</code> を追加するか、<code>if (id)</code> ブランチの前に <code>document.getElementById('prj-status').value = '初回訪問済';</code> を挿入する。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG-9 -->
+  <div class="card bug-group" data-group="med" onclick="toggleCard(this)">
+    <div class="card-stripe med"></div>
+    <div class="card-inner">
+      <div class="card-summary">
+        <span class="bug-id">BUG-09</span>
+        <div class="card-main">
+          <div class="card-title">全 <code>fetch()</code> 呼び出しにエラーハンドリングなし — ネットワーク障害時にサイレント失敗</div>
+          <div class="card-tags">
+            <span class="tag page">全ページ</span>
+            <span class="tag cat">Robustness</span>
+          </div>
+        </div>
+        <span class="expand-icon">▶</span>
+      </div>
+      <div class="card-detail">
+        <div class="detail-grid">
+          <span class="detail-label">原因</span>
+          <span class="detail-value">全ての <code>fetch()</code> に <code>.catch()</code> がなく、サーバー停止やネットワーク断時に Unhandled Promise Rejection が発生。テーブルは空のままエラーメッセージも表示されない。<code>loadDashboard()</code> の <code>Promise.all()</code> も同様。</span>
+
+          <span class="detail-label">修正案</span>
+          <div class="detail-value">
+<pre>async function loadProjects() {
+  try {
+    allProjects = await fetch('/api/projects').then(r =&gt; r.json());
+    renderProjects();
+  } catch (err) {
+    showToast('案件データの取得に失敗しました', 'error');
+  }
+}</pre>
+            全ページロード関数と CRUD submit ハンドラに同様の <code>try/catch</code> を追加。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG-10 -->
+  <div class="card bug-group" data-group="med" onclick="toggleCard(this)">
+    <div class="card-stripe med"></div>
+    <div class="card-inner">
+      <div class="card-summary">
+        <span class="bug-id">BUG-10</span>
+        <div class="card-main">
+          <div class="card-title"><code>.topbar</code> が全ブレークポイントで <code>display: none</code> のまま — モバイルナビ完全非表示</div>
+          <div class="card-tags">
+            <span class="tag page">全ページ (モバイル)</span>
+            <span class="tag cat">Mobile UX</span>
+          </div>
+        </div>
+        <span class="expand-icon">▶</span>
+      </div>
+      <div class="card-detail">
+        <div class="detail-grid">
+          <span class="detail-label">原因</span>
+          <span class="detail-value">デフォルト CSS に <code>.topbar { display: none }</code>。<code>@media (max-width: 1100px)</code> ブロックも同じく <code>display: none</code> を再定義。<code>display: flex</code> に切り替えるメディアクエリが存在しないため、いかなる画面サイズでもトップバーは表示されない。BUG-02 と合わせて修正が必要。</span>
+
+          <span class="detail-label">修正案</span>
+          <div class="detail-value">
+<pre>@media (max-width: 480px) {
+  .topbar  { display: flex; }
+  .sidebar { display: none; }
+  .main    { margin-left: 0; padding-top: 68px; }
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOW SEVERITY -->
+  <div class="section-head bug-group" data-group="low">
+    <span class="section-badge low">Low — 2件</span>
+    <div class="section-rule"></div>
+  </div>
+
+  <!-- BUG-11 -->
+  <div class="card bug-group" data-group="low" onclick="toggleCard(this)">
+    <div class="card-stripe low"></div>
+    <div class="card-inner">
+      <div class="card-summary">
+        <span class="bug-id">BUG-11</span>
+        <div class="card-main">
+          <div class="card-title">テーブルセルのテキストに HTML エスケープなし — <code>&lt;</code> を含む名前でレイアウト崩れ</div>
+          <div class="card-tags">
+            <span class="tag page">案件管理 / 顧客台帳 / 社員管理</span>
+            <span class="tag cat">Data Safety</span>
+          </div>
+        </div>
+        <span class="expand-icon">▶</span>
+      </div>
+      <div class="card-detail">
+        <div class="detail-grid">
+          <span class="detail-label">原因</span>
+          <span class="detail-value"><code>&lt;</code> や <code>&gt;</code> を含む名前（例: <code>外壁塗装工事 &lt; 見積中 &gt;</code>）がテーブルに挿入されると HTML タグとして解釈され行が崩れる。BUG-06 の <code>html()</code> ヘルパーを適用すれば同時に解決する。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG-12 -->
+  <div class="card bug-group" data-group="low" onclick="toggleCard(this)">
+    <div class="card-stripe low"></div>
+    <div class="card-inner">
+      <div class="card-summary">
+        <span class="bug-id">BUG-12</span>
+        <div class="card-main">
+          <div class="card-title">ステータス値 <code>初回訪問済</code> と仕様書の <code>初回面談</code> が不一致</div>
+          <div class="card-tags">
+            <span class="tag page">案件管理</span>
+            <span class="tag cat">用語統一</span>
+          </div>
+        </div>
+        <span class="expand-icon">▶</span>
+      </div>
+      <div class="card-detail">
+        <div class="detail-grid">
+          <span class="detail-label">状況</span>
+          <span class="detail-value">コード全体は <code>初回訪問済</code> で統一されており内部整合性は取れている（<code>済</code> 接尾辞パターンに準拠）。ただし当初仕様書では <code>初回面談</code> と記載されている。バグではなく用語の確認事項。</span>
+
+          <span class="detail-label">対応</span>
+          <span class="detail-value">PO に確認の上、変更する場合は <code>server.js</code>（デフォルト値・クエリ）と <code>index.html</code>（フィルタ・セレクト・STATUS_COLOR マップ）の 6 箇所を一括変更する。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSED CHECKS -->
+  <div class="section-head bug-group" data-group="pass">
+    <span class="section-badge pass">Passed — 22件</span>
+    <div class="section-rule"></div>
+  </div>
+
+  <div class="pass-grid bug-group" data-group="pass">
+    <div class="pass-item"><span class="pass-check">✓</span>API ルートの定義順（シャドウイングなし）</div>
+    <div class="pass-item"><span class="pass-check">✓</span>社員削除時に projects/customers.staff を自動 NULL 化</div>
+    <div class="pass-item"><span class="pass-check">✓</span>全 CREATE / UPDATE エンドポイントの必須フィールド検証</div>
+    <div class="pass-item"><span class="pass-check">✓</span>ステータスフィルター <code>?status=</code> のパラメータ化 SQL</div>
+    <div class="pass-item"><span class="pass-check">✓</span>無効フィルター値に対し空配列 <code>[]</code> を返す</div>
+    <div class="pass-item"><span class="pass-check">✓</span>CRUD 成功・失敗時のトースト通知</div>
+    <div class="pass-item"><span class="pass-check">✓</span>削除確認ダイアログへの日本語テキスト（社員は cascade 警告付き）</div>
+    <div class="pass-item"><span class="pass-check">✓</span>モーダルバックドロップクリックで閉じる</div>
+    <div class="pass-item"><span class="pass-check">✓</span>CRUD 後に該当配列を再フェッチして再描画</div>
+    <div class="pass-item"><span class="pass-check">✓</span><code>loaded['dashboard']</code> フラグのリセット処理</div>
+    <div class="pass-item"><span class="pass-check">✓</span><code>toInputDate()</code> による日付フォーマット変換</div>
+    <div class="pass-item"><span class="pass-check">✓</span><code>fmt()</code> の null / 0 / 万円 / 億円エッジケース</div>
+    <div class="pass-item"><span class="pass-check">✓</span><code>esc()</code> による inline onclick インジェクション防止</div>
+    <div class="pass-item"><span class="pass-check">✓</span>KPI 計算 SQL（契約済は contract_amount、商談中は estimate_amount）</div>
+    <div class="pass-item"><span class="pass-check">✓</span><code>/api/summary</code> の全フィールド存在確認</div>
+    <div class="pass-item"><span class="pass-check">✓</span>6 サイドバーリンクと <code>#page-*</code> ID の対応</div>
+    <div class="pass-item"><span class="pass-check">✓</span>全 GET エンドポイントが有効な JSON を返す構造</div>
+    <div class="pass-item"><span class="pass-check">✓</span>Chart.js CDN バージョン固定（4.4.0）</div>
+    <div class="pass-item"><span class="pass-check">✓</span>レスポンシブ CSS ブレークポイント定義（1100px / 480px）</div>
+    <div class="pass-item"><span class="pass-check">✓</span>400 エラーレスポンスに日本語メッセージ</div>
+    <div class="pass-item"><span class="pass-check">✓</span><code>closeFormModal()</code> の open クラス除去</div>
+    <div class="pass-item"><span class="pass-check">✓</span><code>showToast()</code> の 3000ms 後自動消去</div>
+  </div>
+
+</main>
+
+<script>
+  function toggleCard(card) {
+    card.classList.toggle('open');
+  }
+
+  function filterBugs(group, statEl) {
+    document.querySelectorAll('.stat').forEach(s => s.classList.remove('active'));
+    statEl.classList.add('active');
+
+    document.querySelectorAll('.bug-group').forEach(el => {
+      if (group === 'all') {
+        el.classList.remove('hidden');
+      } else {
+        const g = el.dataset.group;
+        el.classList.toggle('hidden', g !== group);
+      }
+    });
+  }
+</script>

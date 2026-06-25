@@ -1,0 +1,24 @@
+# Excel source data (excluded per project policy)
+HandsOn_資料/
+
+# Node
+dashboard/node_modules/
+
+# Database (runtime artifact, not source)
+dashboard/sakura.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code local settings
+.claude/settings.local.json
+.claude/agent-memory/
+
+# Editor
+.vscode/
+.idea/
